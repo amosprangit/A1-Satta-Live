@@ -25,7 +25,7 @@ $game_timings = getGameTimings($pdo);
 require_once 'header.php';
 ?>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="./css/style.css">
 
 <!-- Success/Error Messages from admin actions -->
 <?php if (isset($_SESSION['success'])): ?>

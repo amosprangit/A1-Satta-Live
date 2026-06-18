@@ -760,10 +760,10 @@ require_once 'header.php';
 <div class="admin-container">
     <!-- Admin Header -->
     <div class="admin-header">
-        <h1>🛡️ Admin Dashboard</h1>
+        <h1>Admin Dashboard</h1>
         <div class="header-actions">
-            <a href="index.php">🌐 View Website</a>
-            <a href="?logout=1" class="logout-btn" onclick="return confirm('Are you sure you want to logout?')">🚪 Logout</a>
+            <a href="index.php">View Website</a>
+            <a href="?logout=1" class="logout-btn" onclick="return confirm('Are you sure you want to logout?')"Logout</a>
         </div>
     </div>
 
@@ -781,26 +781,6 @@ require_once 'header.php';
                 unset($_SESSION['error']); ?>
             </div>
     <?php endif; ?>
-
-    <!-- Statistics -->
-    <div class="stat-cards">
-        <div class="stat-card">
-            <div class="number"><?php echo count($all_games); ?></div>
-            <div class="label">Total Games</div>
-        </div>
-        <div class="stat-card">
-            <div class="number"><?php echo count($chart_dates); ?></div>
-            <div class="label">Chart Dates</div>
-        </div>
-        <div class="stat-card">
-            <div class="number"><?php echo count($game_timings); ?></div>
-            <div class="label">Game Timings</div>
-        </div>
-        <div class="stat-card">
-            <div class="number"><?php echo count($game_rates); ?></div>
-            <div class="label">Game Rates</div>
-        </div>
-    </div>
 
     <!-- Tabs Navigation -->
     <div class="tabs">
