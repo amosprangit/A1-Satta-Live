@@ -1,0 +1,490 @@
+.highlight {
+  background: #ffd700;
+  color: #000;
+  text-align: center;
+  padding: 20px;
+  font-size: 40px;
+  font-weight: bold;
+  letter-spacing: 4px;
+}
+
+.disawer-timing {
+  background: #ffd700;
+  text-align: center;
+  padding: 10px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.disawer-arrow {
+  background: #ffd700;
+  text-align: center;
+  padding: 20px;
+  font-size: 28px;
+  font-weight: bold;
+  letter-spacing: 10px;
+}
+
+.social-cards-wrapper {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 20px 12px;
+}
+
+.social-card {
+  flex: 1;
+  min-width: 280px;
+  max-width: 500px;
+  border-radius: 20px;
+  padding: 20px 18px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.social-card:hover {
+  transform: translateY(-3px);
+}
+
+.whatsapp-card {
+  background: #d4edda;
+  border: 2px solid #25d366;
+}
+
+.telegram-card {
+  background: #d4e9ff;
+  border: 2px solid #26a5e4;
+}
+
+.social-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.social-text {
+  font-size: 13px;
+  font-weight: bold;
+  color: #1a1a2e;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px;
+  border-radius: 50px;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 15px;
+  color: white;
+  transition: 0.3s;
+  border: none;
+  cursor: pointer;
+}
+
+.social-btn:hover {
+  transform: scale(1.05);
+  color: white;
+}
+
+.whatsapp-btn {
+  background: #25d366;
+}
+
+.whatsapp-btn:hover {
+  background: #1da851;
+}
+
+.telegram-btn {
+  background: #26a5e4;
+}
+
+.telegram-btn:hover {
+  background: #1a8bc8;
+}
+
+.social-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.notification-card {
+  background: #ffd800;
+  margin: 12px;
+  padding: 20px;
+  border-radius: 20px;
+  text-align: center;
+  border: 2px dashed red;
+  font-weight: bold;
+}
+
+.notification-card h2 {
+  font-size: 20px;
+  color: #000;
+  margin: 0;
+}
+
+.notification-card a {
+  color: #000;
+}
+
+#play-time-info {
+  margin-top: 20px;
+  background: #ffd700;
+  text-align: center;
+  margin-left: 16px;
+  border-radius: 16px;
+  border: 3px dotted red;
+  padding: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  width: 30%;
+  display: grid;
+  place-content: center;
+  place-items: center;
+}
+
+#play-time-info p {
+  padding: 2px;
+}
+
+#play-time-info a div {
+  background: #1da851;
+  border-radius: 100%;
+  color: black;
+  text-align: center;
+  padding: 18px;
+}
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+}
+
+.result-table thead th {
+  background: #000;
+  color: #ffd700;
+  padding: 18px 15px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  border: 1px solid #333;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.result-table tbody td {
+  padding: 14px 15px;
+  text-align: center;
+  font-size: 16px;
+  border: 1px solid #e0e0e0;
+  vertical-align: middle;
+}
+
+.result-table tbody tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+.result-table tbody tr:hover {
+  background: #fff8e0;
+}
+
+.game-name {
+  background: #ffd700;
+  color: #000;
+  text-align: left !important;
+  padding-left: 25px !important;
+  font-weight: bold;
+  width: 35%;
+}
+
+.game-name a {
+  color: #000;
+  text-decoration: none;
+  display: block;
+  font-size: 17px;
+}
+
+.game-name a:hover {
+  text-decoration: underline;
+}
+
+.game-time {
+  font-size: 13px;
+  font-weight: normal;
+  color: #555;
+  display: block;
+  margin-top: 2px;
+}
+
+.yesterday-result {
+  background: #f0f0f0;
+  font-weight: bold;
+  font-size: 18px;
+  color: #333;
+  width: 25%;
+}
+
+.today-result {
+  background: #f0f0f0;
+  font-weight: bold;
+  font-size: 18px;
+  width: 25%;
+}
+
+.result-value {
+  color: #1a1a2e;
+  font-size: 22px;
+}
+
+.wait-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #d32f2f;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.wait-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.chart-selector {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin: 20px;
+}
+
+.chart-selector select,
+.chart-selector button {
+  padding: 12px 24px;
+  border-radius: 40px;
+  font-size: 16px;
+  font-weight: bold;
+  border: 2px solid #ffd700;
+  background: #fff;
+  cursor: pointer;
+}
+
+.chart-selector button {
+  background: #ffd700;
+  border: none;
+}
+
+.chart-table-wrapper {
+  overflow-x: auto;
+  margin: 20px;
+}
+
+.chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 14px;
+}
+
+.chart-table th,
+.chart-table td {
+  padding: 10px 5px;
+  font-size: 13px;
+  border: 1px solid #ddd;
+}
+
+.chart-table th {
+  color: #ffd700;
+  font-size: 14px;
+}
+
+.chart-number {
+  display: inline-block;
+  padding: 4px 10px;
+  /* color: #ffd966; */
+  font-weight: bold;
+  min-width: 45px;
+}
+
+.content-section {
+  background: #fff;
+  margin: 20px;
+  padding: 30px;
+  border-radius: 20px;
+}
+
+.content-section h5 {
+  color: #c45a00;
+  margin: 25px 0 15px;
+  font-size: 20px;
+}
+
+.content-section p {
+  line-height: 1.6;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.footer {
+  background: #000;
+  text-align: center;
+  padding: 30px;
+  border-top: 1px solid #333;
+}
+
+.footer a {
+  color: #ffd700;
+  text-decoration: none;
+  margin: 0 20px;
+  font-size: 16px;
+}
+
+.footer p {
+  color: #666;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.disclaimer {
+  background: #111;
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+}
+
+@media (max-width: 768px) {
+  .result-table thead th {
+    font-size: 14px;
+    padding: 12px 8px;
+  }
+
+  .result-table tbody td {
+    font-size: 14px;
+    padding: 10px 8px;
+  }
+
+  .game-name {
+    padding-left: 15px !important;
+    width: 30%;
+  }
+
+  .game-name a {
+    font-size: 14px;
+  }
+
+  .game-time {
+    font-size: 11px;
+  }
+
+  .yesterday-result,
+  .today-result {
+    font-size: 15px;
+    width: 20%;
+  }
+
+  .result-value {
+    font-size: 18px;
+  }
+
+  .wait-icon {
+    font-size: 13px;
+  }
+
+  .wait-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .result-number {
+    font-size: 55px;
+    padding: 15px 30px;
+  }
+
+  .chart-number {
+    font-size: 11px;
+    min-width: 35px;
+  }
+
+  .social-card {
+    min-width: 200px;
+    padding: 15px 12px;
+  }
+
+  .social-text {
+    font-size: 12px;
+  }
+
+  .social-btn {
+    padding: 8px 18px;
+    font-size: 13px;
+  }
+
+  .social-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .notification-card h2 {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .result-table thead th {
+    font-size: 11px;
+    padding: 8px 4px;
+  }
+
+  .result-table tbody td {
+    font-size: 12px;
+    padding: 8px 4px;
+  }
+
+  .game-name a {
+    font-size: 12px;
+  }
+
+  .game-time {
+    font-size: 9px;
+  }
+
+  .yesterday-result,
+  .today-result {
+    font-size: 13px;
+  }
+
+  .result-value {
+    font-size: 15px;
+  }
+
+  .wait-icon {
+    font-size: 11px;
+  }
+
+  .wait-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .social-cards-wrapper {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .social-card {
+    min-width: 100%;
+    max-width: 100%;
+  }
+}
