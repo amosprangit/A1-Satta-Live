@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 require_once 'config.php';
 
 // Set page title for header
@@ -26,7 +29,7 @@ require_once 'header.php';
 ?>
 
 <link rel="stylesheet" href="./css/style.css">
-
+<meta charset="UTF-8">
 <!-- Success/Error Messages from admin actions -->
 <?php if (isset($_SESSION['success'])): ?>
     <div class="admin-message success-msg"
@@ -152,18 +155,18 @@ require_once 'header.php';
 
     <p>🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻</p>
     <p>सीधे सट्टा कंपनी का No 1 खाईवाल *Game play करने के लिये नीचे क्लिक करे*</p>
-    <a href="https://wa.me/+919812287328" target="_blank">
-        <div>
+    <div class="whatsapp-button">
+        <a href="https://wa.me/1234567890" target="_blank">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
                 <path fill="#25D366"
                     d="M35.5,12.5C31.9,8.9,27.1,7,22,7c-8.3,0-15,6.7-15,15c0,2.7,0.7,5.3,2,7.6L7,41l11.9-3.1c2.2,1.2,4.7,1.8,7.2,1.8h0c8.3,0,15-6.7,15-15C41,18.6,39.1,14.1,35.5,12.5z" />
                 <path fill="#FFF"
                     d="M24.1,9.5c-7.2,0-13,5.8-13,13c0,2.3,0.6,4.5,1.7,6.4L11.7,36l7.4-1.9c1.9,1,4,1.6,6.2,1.6c7.2,0,13-5.8,13-13S31.3,9.5,24.1,9.5z M33.6,24.6c-0.5,1.5-2.6,2.8-4.2,3.1c-0.7,0.1-1.3,0.2-1.8,0.2c-0.9,0-1.9-0.3-2.9-0.9c-1.3-0.8-2.4-1.9-3.5-3c-0.9-0.9-1.8-2-2.5-3.1c-0.7-1.1-1.2-2.1-1.2-3c0-0.9,0.3-1.6,0.9-2.1c0.4-0.4,0.9-0.6,1.3-0.6c0.3,0,0.6,0,0.9,0c0.3,0,0.6,0,0.9,0.5c0.3,0.5,0.8,1.5,0.9,1.6c0.1,0.2,0.1,0.4,0,0.6c0,0.2-0.1,0.3-0.2,0.5c-0.1,0.2-0.3,0.4-0.4,0.6c-0.1,0.2-0.2,0.3-0.1,0.5c0.1,0.2,0.5,0.8,0.9,1.3c0.6,0.8,1.3,1.5,2.1,2c0.8,0.5,1.5,0.8,2.1,0.9c0.3,0.1,0.5,0.1,0.7,0c0.2-0.1,0.4-0.2,0.5-0.4c0.1-0.2,0.4-0.4,0.5-0.6c0.1-0.2,0.4-0.2,0.6-0.1c0.2,0.1,1.5,0.7,1.8,0.8c0.3,0.1,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.8-0.1,1.3C33.9,24.1,33.8,24.3,33.6,24.6z" />
             </svg>
-            What's App
-            <p>Click to chat</p>
-        </div>
-    </a>
+            WhatsApp
+            <p>Click to Chat</p>
+        </a>
+    </div>
 </div>
 
 <!-- TABLE 1 - Main Games -->
@@ -184,8 +187,7 @@ require_once 'header.php';
                 ?>
                 <tr>
                     <td class="game-name">
-                        <a
-                            href="/<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
+                        <a href="game.php?game=<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
                         <span class="game-time"><?php echo $data['result_time']; ?></span>
                     </td>
                     <td class="yesterday-result"><?php echo $data['yesterday_result']; ?></td>
@@ -230,7 +232,7 @@ require_once 'header.php';
                 <tr>
                     <td class="game-name">
                         <a
-                            href="/<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
+                            href="game.php?game=<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
                         <span class="game-time"><?php echo $data['result_time']; ?></span>
                     </td>
                     <td class="yesterday-result"><?php echo $data['yesterday_result']; ?></td>
@@ -256,7 +258,6 @@ require_once 'header.php';
     </table>
 </div>
 
-<!-- Chart Selector -->
 <!-- Chart Selector -->
 <div class="chart-selector">
     <select id="chartGameSelect">

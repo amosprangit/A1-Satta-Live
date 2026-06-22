@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to update chart!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=chart');
         exit();
     }
 
@@ -82,33 +82,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $month = $_POST['gen_chart_month'];
         $year = $_POST['gen_chart_year'];
 
+        if (empty($game) || empty($month) || empty($year)) {
+            $_SESSION['error'] = "❌ Please fill all fields!";
+            header('Location: admin-dashboard.php?tab=chart');
+            exit();
+        }
+
         // Generate data for the entire month
         $days_in_month = cal_days_in_month(CAL_GREGORIAN, (int) $month, (int) $year);
-        $sample_results = ['39', '52', '18', '43', '86', '71', '47', '31', '65', '80', '95', '110', '125', '140', '155', '170', '185', '200', '215', '230', '245', '260', '275', '290', '305', '320', '335', '350', '365', '380', '395'];
 
-        // Determine table type
-        $table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali', 'disawer'];
-        $table_type = in_array($game, $table1_games) ? 'table1' : 'table2';
+        $sample_results = [
+            '12',
+            '45',
+            '78',
+            '23',
+            '56',
+            '89',
+            '34',
+            '67',
+            '90',
+            '15',
+            '48',
+            '71',
+            '29',
+            '53',
+            '86',
+            '41',
+            '74',
+            '18',
+            '62',
+            '95',
+            '37',
+            '50',
+            '83',
+            '26',
+            '59',
+            '92',
+            '35',
+            '68',
+            '10',
+            '43',
+            '76'
+        ];
+
+        // Get table type from database
+        $game_info = getGameResults($pdo, $game);
+        $table_type = $game_info ? $game_info['table_type'] : 'table1';
 
         $count = 0;
         for ($day = 1; $day <= $days_in_month; $day++) {
             $date_str = str_pad($day, 2, '0', STR_PAD_LEFT) . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
-            $result = $sample_results[($day - 1) % count($sample_results)];
+            $result = $sample_results[array_rand($sample_results)];
 
-            $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) 
-                                   VALUES (?, ?, ?, ?) 
-                                   ON DUPLICATE KEY UPDATE result_number = VALUES(result_number)");
-            if ($stmt->execute([$game, $date_str, $result, $table_type])) {
+            // Use updateChartData function
+            if (updateChartData($pdo, $game, $date_str, $result, $table_type)) {
                 $count++;
             }
         }
 
         if ($count > 0) {
-            $_SESSION['success'] = "✅ Generated $count entries for " . ucfirst($game) . " in " . $month . '-' . $year;
+            $_SESSION['success'] = "✅ Generated/Updated $count entries for " . ucfirst($game) . " - " . $month . '/' . $year . " (Table: " . $table_type . ")";
         } else {
             $_SESSION['error'] = "❌ Failed to generate chart data!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=chart');
         exit();
     }
 
@@ -119,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to add timing!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=timings');
         exit();
     }
 
@@ -130,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to update timing!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=timings');
         exit();
     }
 
@@ -141,7 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to add rate!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=rates');
         exit();
     }
 
@@ -152,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to update rate!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=rates');
         exit();
     }
 
@@ -163,7 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to add result!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=multiple');
         exit();
     }
 
@@ -174,7 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $_SESSION['error'] = "❌ Failed to update result!";
         }
-        header('Location: admin-dashboard.php');
+        header('Location: admin-dashboard.php?tab=multiple');
         exit();
     }
 }
@@ -196,7 +233,7 @@ if (isset($_GET['delete_chart'])) {
     } else {
         $_SESSION['error'] = "❌ Failed to delete chart data!";
     }
-    header('Location: admin-dashboard.php');
+    header('Location: admin-dashboard.php?tab=chart');
     exit();
 }
 
@@ -206,7 +243,7 @@ if (isset($_GET['delete_timing'])) {
     } else {
         $_SESSION['error'] = "❌ Failed to delete timing!";
     }
-    header('Location: admin-dashboard.php');
+    header('Location: admin-dashboard.php?tab=timings');
     exit();
 }
 
@@ -216,7 +253,7 @@ if (isset($_GET['delete_rate'])) {
     } else {
         $_SESSION['error'] = "❌ Failed to delete rate!";
     }
-    header('Location: admin-dashboard.php');
+    header('Location: admin-dashboard.php?tab=rates');
     exit();
 }
 
@@ -226,7 +263,7 @@ if (isset($_GET['delete_multiple_result'])) {
     } else {
         $_SESSION['error'] = "❌ Failed to delete result!";
     }
-    header('Location: admin-dashboard.php');
+    header('Location: admin-dashboard.php?tab=multiple');
     exit();
 }
 
@@ -238,7 +275,7 @@ if (isset($_GET['toggle_timing'])) {
         toggleGameTiming($pdo, $_GET['toggle_timing'], $current['is_active'] ? 0 : 1);
         $_SESSION['success'] = "✅ Timing status toggled!";
     }
-    header('Location: admin-dashboard.php');
+    header('Location: admin-dashboard.php?tab=timings');
     exit();
 }
 
@@ -250,7 +287,7 @@ if (isset($_GET['toggle_rate'])) {
         toggleGameRate($pdo, $_GET['toggle_rate'], $current['is_active'] ? 0 : 1);
         $_SESSION['success'] = "✅ Rate status toggled!";
     }
-    header('Location: admin-dashboard.php');
+    header('Location: admin-dashboard.php?tab=rates');
     exit();
 }
 
@@ -258,6 +295,9 @@ if (isset($_GET['toggle_rate'])) {
 if (isset($_GET['logout'])) {
     logoutAdmin();
 }
+
+// Get current tab
+$current_tab = $_GET['tab'] ?? 'games';
 
 // Check if we're editing from URL parameters
 $edit_game = $_GET['edit_game'] ?? '';
@@ -285,6 +325,9 @@ $table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri g
 $table2_games = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
 $chart1_games = array_merge($table1_games, ['disawer']);
 $chart2_games = $table2_games;
+
+// For chart data display - use $all_chart_data directly
+$chart_data_display = $all_chart_data;
 
 require_once 'header.php';
 ?>
@@ -682,6 +725,7 @@ require_once 'header.php';
         transition: all 0.3s;
         text-decoration: none;
         display: inline-block;
+        color: #000;
     }
 
     .tab-btn.active {
@@ -760,39 +804,65 @@ require_once 'header.php';
 <div class="admin-container">
     <!-- Admin Header -->
     <div class="admin-header">
-        <h1>Admin Dashboard</h1>
+        <h1>🏆 Admin Dashboard</h1>
         <div class="header-actions">
-            <a href="index.php">View Website</a>
-            <a href="?logout=1" class="logout-btn" onclick="return confirm('Are you sure you want to logout?')"Logout</a>
+            <a href="index.php" target="_blank">🌐 View Website</a>
+            <a href="?logout=1" class="logout-btn" onclick="return confirm('Are you sure you want to logout?')">🚪
+                Logout</a>
         </div>
     </div>
 
     <!-- Messages -->
     <?php if (isset($_SESSION['success'])): ?>
-            <div class="success-msg">
-                <?php echo $_SESSION['success'];
-                unset($_SESSION['success']); ?>
-            </div>
+        <div class="success-msg">
+            <?php echo $_SESSION['success'];
+            unset($_SESSION['success']); ?>
+        </div>
     <?php endif; ?>
 
     <?php if (isset($_SESSION['error'])): ?>
-            <div class="error-msg">
-                <?php echo $_SESSION['error'];
-                unset($_SESSION['error']); ?>
-            </div>
+        <div class="error-msg">
+            <?php echo $_SESSION['error'];
+            unset($_SESSION['error']); ?>
+        </div>
     <?php endif; ?>
+
+    <!-- Stats Cards -->
+    <div class="stat-cards">
+        <div class="stat-card">
+            <div class="number"><?php echo count($all_games); ?></div>
+            <div class="label">Total Games</div>
+        </div>
+        <div class="stat-card">
+            <div class="number"><?php echo count($game_timings); ?></div>
+            <div class="label">Game Timings</div>
+        </div>
+        <div class="stat-card">
+            <div class="number"><?php echo count($game_rates); ?></div>
+            <div class="label">Game Rates</div>
+        </div>
+        <div class="stat-card">
+            <div class="number"><?php echo count($all_chart_data); ?></div>
+            <div class="label">Chart Entries</div>
+        </div>
+    </div>
 
     <!-- Tabs Navigation -->
     <div class="tabs">
-        <a href="admin-dashboard.php?tab=games" class="tab-btn <?php echo (!isset($_GET['tab']) || $_GET['tab'] === 'games') ? 'active' : ''; ?>">🎮 Games</a>
-        <a href="admin-dashboard.php?tab=chart" class="tab-btn <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'chart') ? 'active' : ''; ?>">📊 Charts</a>
-        <a href="admin-dashboard.php?tab=timings" class="tab-btn <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'timings') ? 'active' : ''; ?>">⏰ Timings</a>
-        <a href="admin-dashboard.php?tab=rates" class="tab-btn <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'rates') ? 'active' : ''; ?>">💰 Rates</a>
-        <a href="admin-dashboard.php?tab=multiple" class="tab-btn <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'multiple') ? 'active' : ''; ?>">📝 Multiple Results</a>
+        <a href="admin-dashboard.php?tab=games"
+            class="tab-btn <?php echo $current_tab === 'games' ? 'active' : ''; ?>">🎮 Games</a>
+        <a href="admin-dashboard.php?tab=chart"
+            class="tab-btn <?php echo $current_tab === 'chart' ? 'active' : ''; ?>">📊 Charts</a>
+        <a href="admin-dashboard.php?tab=timings"
+            class="tab-btn <?php echo $current_tab === 'timings' ? 'active' : ''; ?>">⏰ Timings</a>
+        <a href="admin-dashboard.php?tab=rates"
+            class="tab-btn <?php echo $current_tab === 'rates' ? 'active' : ''; ?>">💰 Rates</a>
+        <a href="admin-dashboard.php?tab=multiple"
+            class="tab-btn <?php echo $current_tab === 'multiple' ? 'active' : ''; ?>">📝 Multiple Results</a>
     </div>
 
     <!-- ==================== TAB 1: GAMES ==================== -->
-    <div id="tab-games" class="tab-content <?php echo (!isset($_GET['tab']) || $_GET['tab'] === 'games') ? 'active' : ''; ?>">
+    <div id="tab-games" class="tab-content <?php echo $current_tab === 'games' ? 'active' : ''; ?>">
         <!-- Edit Disawer -->
         <div class="admin-section">
             <h2>✏️ Edit Disawer Result</h2>
@@ -800,11 +870,13 @@ require_once 'header.php';
                 <input type="hidden" name="update_disawer" value="1">
                 <div class="form-group">
                     <label>Yesterday Result:</label>
-                    <input type="text" name="disawer_yesterday" value="<?php echo $disawer_yesterday; ?>" style="width:120px; text-align:center; font-size:18px;">
+                    <input type="text" name="disawer_yesterday" value="<?php echo $disawer_yesterday; ?>"
+                        style="width:120px; text-align:center; font-size:18px;">
                 </div>
                 <div class="form-group">
                     <label>Today Result:</label>
-                    <input type="text" name="disawer_today" value="<?php echo $disawer_result; ?>" style="width:120px; text-align:center; font-size:18px;">
+                    <input type="text" name="disawer_today" value="<?php echo $disawer_result; ?>"
+                        style="width:120px; text-align:center; font-size:18px;">
                 </div>
                 <button type="submit" class="btn-primary">💾 Update Disawer</button>
             </form>
@@ -865,19 +937,23 @@ require_once 'header.php';
                         <?php foreach ($table1_games as $game):
                             $data = $all_games[$game] ?? ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
                             ?>
-                                <tr>
-                                    <td class="game-name-cell"><?php echo ucfirst($game); ?></td>
-                                    <td><?php echo $data['display_name'] ?: ucfirst($game); ?></td>
-                                    <td><?php echo $data['yesterday_result']; ?></td>
-                                    <td><?php echo $data['today_result']; ?></td>
-                                    <td><?php echo $data['result_time']; ?></td>
-                                    <td>
-                                        <div class="actions-cell">
-                                            <button class="btn-edit" onclick="openEditModal('<?php echo $game; ?>', '<?php echo $data['yesterday_result']; ?>', '<?php echo $data['today_result']; ?>', '<?php echo $data['result_time']; ?>', '<?php echo $data['display_name']; ?>')">✏️ Edit</button>
-                                            <a href="?delete_game=<?php echo urlencode($game); ?>" class="btn-delete" onclick="return confirm('Delete game \'<?php echo ucfirst($game); ?>\'?')">🗑️ Delete</a>
-                                        </div>
-                                    </td>
-                                </tr>
+                            <tr>
+                                <td class="game-name-cell"><?php echo ucfirst($game); ?></td>
+                                <td><?php echo $data['display_name'] ?: ucfirst($game); ?></td>
+                                <td><?php echo $data['yesterday_result']; ?></td>
+                                <td><?php echo $data['today_result']; ?></td>
+                                <td><?php echo $data['result_time']; ?></td>
+                                <td>
+                                    <div class="actions-cell">
+                                        <button class="btn-edit"
+                                            onclick="openEditModal('<?php echo $game; ?>', '<?php echo $data['yesterday_result']; ?>', '<?php echo $data['today_result']; ?>', '<?php echo $data['result_time']; ?>', '<?php echo $data['display_name']; ?>')">✏️
+                                            Edit</button>
+                                        <a href="?delete_game=<?php echo urlencode($game); ?>" class="btn-delete"
+                                            onclick="return confirm('Delete game \'<?php echo ucfirst($game); ?>\'?')">🗑️
+                                            Delete</a>
+                                    </div>
+                                </td>
+                            </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -903,19 +979,23 @@ require_once 'header.php';
                         <?php foreach ($table2_games as $game):
                             $data = $all_games[$game] ?? ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
                             ?>
-                                <tr>
-                                    <td class="game-name-cell"><?php echo ucfirst($game); ?></td>
-                                    <td><?php echo $data['display_name'] ?: ucfirst($game); ?></td>
-                                    <td><?php echo $data['yesterday_result']; ?></td>
-                                    <td><?php echo $data['today_result']; ?></td>
-                                    <td><?php echo $data['result_time']; ?></td>
-                                    <td>
-                                        <div class="actions-cell">
-                                            <button class="btn-edit" onclick="openEditModal('<?php echo $game; ?>', '<?php echo $data['yesterday_result']; ?>', '<?php echo $data['today_result']; ?>', '<?php echo $data['result_time']; ?>', '<?php echo $data['display_name']; ?>')">✏️ Edit</button>
-                                            <a href="?delete_game=<?php echo urlencode($game); ?>" class="btn-delete" onclick="return confirm('Delete game \'<?php echo ucfirst($game); ?>\'?')">🗑️ Delete</a>
-                                        </div>
-                                    </td>
-                                </tr>
+                            <tr>
+                                <td class="game-name-cell"><?php echo ucfirst($game); ?></td>
+                                <td><?php echo $data['display_name'] ?: ucfirst($game); ?></td>
+                                <td><?php echo $data['yesterday_result']; ?></td>
+                                <td><?php echo $data['today_result']; ?></td>
+                                <td><?php echo $data['result_time']; ?></td>
+                                <td>
+                                    <div class="actions-cell">
+                                        <button class="btn-edit"
+                                            onclick="openEditModal('<?php echo $game; ?>', '<?php echo $data['yesterday_result']; ?>', '<?php echo $data['today_result']; ?>', '<?php echo $data['result_time']; ?>', '<?php echo $data['display_name']; ?>')">✏️
+                                            Edit</button>
+                                        <a href="?delete_game=<?php echo urlencode($game); ?>" class="btn-delete"
+                                            onclick="return confirm('Delete game \'<?php echo ucfirst($game); ?>\'?')">🗑️
+                                            Delete</a>
+                                    </div>
+                                </td>
+                            </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -923,34 +1003,39 @@ require_once 'header.php';
         </div>
     </div>
 
-    <!-- ==================== TAB 2: CHARTS (UPDATED) ==================== -->
-    <div id="tab-chart" class="tab-content <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'chart') ? 'active' : ''; ?>">
-        
-        <!-- Edit Chart Data Section (Shown when editing from URL) -->
+    <!-- ==================== TAB 2: CHARTS ==================== -->
+    <div id="tab-chart" class="tab-content <?php echo $current_tab === 'chart' ? 'active' : ''; ?>">
+
+        <!-- Edit Chart Data Section -->
         <?php if ($edit_game && $edit_date): ?>
-                <div class="admin-section" style="border-left-color: #17a2b8; background: #f0f8ff;">
-                    <h2>✏️ Edit Chart Data</h2>
-                    <form method="POST" class="admin-form">
-                        <input type="hidden" name="update_chart" value="1">
-                        <input type="hidden" name="chart_game" value="<?php echo $edit_game; ?>">
-                        <input type="hidden" name="chart_date" value="<?php echo $edit_date; ?>">
-                        <input type="hidden" name="chart_table_type" value="<?php echo $edit_table; ?>">
-                        <div class="form-group">
-                            <label>Game:</label>
-                            <input type="text" value="<?php echo ucfirst($edit_game); ?>" disabled style="background: #f0f0f0; opacity: 0.7;">
-                        </div>
-                        <div class="form-group">
-                            <label>Date:</label>
-                            <input type="text" value="<?php echo $edit_date; ?>" disabled style="background: #f0f0f0; opacity: 0.7;">
-                        </div>
-                        <div class="form-group">
-                            <label>Result Number:</label>
-                            <input type="text" name="chart_result" value="<?php echo $edit_result; ?>" required style="border-color: #17a2b8;">
-                        </div>
-                        <button type="submit" class="btn-info">💾 Update Chart</button>
-                        <a href="admin-dashboard.php?tab=chart" class="btn-danger" style="padding: 10px 20px; border-radius: 40px; text-decoration: none; display: inline-block;">❌ Cancel</a>
-                    </form>
-                </div>
+            <div class="admin-section" style="border-left-color: #17a2b8; background: #f0f8ff;">
+                <h2>✏️ Edit Chart Data</h2>
+                <form method="POST" class="admin-form">
+                    <input type="hidden" name="update_chart" value="1">
+                    <input type="hidden" name="chart_game" value="<?php echo $edit_game; ?>">
+                    <input type="hidden" name="chart_date" value="<?php echo $edit_date; ?>">
+                    <input type="hidden" name="chart_table_type" value="<?php echo $edit_table; ?>">
+                    <div class="form-group">
+                        <label>Game:</label>
+                        <input type="text" value="<?php echo ucfirst($edit_game); ?>" disabled
+                            style="background: #f0f0f0; opacity: 0.7;">
+                    </div>
+                    <div class="form-group">
+                        <label>Date:</label>
+                        <input type="text" value="<?php echo $edit_date; ?>" disabled
+                            style="background: #f0f0f0; opacity: 0.7;">
+                    </div>
+                    <div class="form-group">
+                        <label>Result Number:</label>
+                        <input type="text" name="chart_result" value="<?php echo $edit_result; ?>" required
+                            style="border-color: #17a2b8;">
+                    </div>
+                    <button type="submit" class="btn-info">💾 Update Chart</button>
+                    <a href="admin-dashboard.php?tab=chart" class="btn-danger"
+                        style="padding: 10px 20px; border-radius: 40px; text-decoration: none; display: inline-block;">❌
+                        Cancel</a>
+                </form>
+            </div>
         <?php endif; ?>
 
         <!-- Add New Chart Data -->
@@ -967,23 +1052,28 @@ require_once 'header.php';
                         foreach ($all_games_list as $game):
                             $selected = ($selected_game && $game === $selected_game) ? 'selected' : '';
                             ?>
-                                <option value="<?php echo $game; ?>" <?php echo $selected; ?>><?php echo ucfirst($game); ?></option>
+                            <option value="<?php echo $game; ?>" <?php echo $selected; ?>><?php echo ucfirst($game); ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Date (DD-MM):</label>
-                    <input type="text" name="chart_date" placeholder="e.g. 01-06" required value="<?php echo $edit_date ?: ''; ?>">
+                    <input type="text" name="chart_date" placeholder="e.g. 01-06" required
+                        value="<?php echo $edit_date ?: ''; ?>">
                 </div>
                 <div class="form-group">
                     <label>Result Number:</label>
-                    <input type="text" name="chart_result" placeholder="Enter result number" required value="<?php echo $edit_result ?: ''; ?>">
+                    <input type="text" name="chart_result" placeholder="Enter result number" required
+                        value="<?php echo $edit_result ?: ''; ?>">
                 </div>
                 <div class="form-group">
                     <label>Table Type:</label>
                     <select name="chart_table_type" required>
-                        <option value="table1" <?php echo ($edit_table === 'table1') ? 'selected' : ''; ?>>Table 1</option>
-                        <option value="table2" <?php echo ($edit_table === 'table2') ? 'selected' : ''; ?>>Table 2</option>
+                        <option value="table1" <?php echo ($edit_table === 'table1') ? 'selected' : ''; ?>>Table 1
+                        </option>
+                        <option value="table2" <?php echo ($edit_table === 'table2') ? 'selected' : ''; ?>>Table 2
+                        </option>
                     </select>
                 </div>
                 <button type="submit" class="btn-success">💾 Save Chart Data</button>
@@ -1003,7 +1093,7 @@ require_once 'header.php';
                         $all_games_list = getGameNames($pdo);
                         foreach ($all_games_list as $game):
                             ?>
-                                <option value="<?php echo $game; ?>"><?php echo ucfirst($game); ?></option>
+                            <option value="<?php echo $game; ?>"><?php echo ucfirst($game); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -1039,22 +1129,25 @@ require_once 'header.php';
         <!-- Chart Data List -->
         <div class="admin-section">
             <h2>📋 All Chart Data</h2>
-            
+
             <?php if (!empty($chart_data_display)): ?>
-                    <div class="chart-stats">
-                        <div class="chart-stat">
-                            <div class="number"><?php echo count($chart_data_display); ?></div>
-                            <div class="label">Total Entries</div>
-                        </div>
-                        <div class="chart-stat">
-                            <div class="number"><?php echo count(array_unique(array_column($chart_data_display, 'game_name'))); ?></div>
-                            <div class="label">Unique Games</div>
-                        </div>
-                        <div class="chart-stat">
-                            <div class="number"><?php echo count(array_unique(array_column($chart_data_display, 'date'))); ?></div>
-                            <div class="label">Unique Dates</div>
-                        </div>
+                <div class="chart-stats">
+                    <div class="chart-stat">
+                        <div class="number"><?php echo count($chart_data_display); ?></div>
+                        <div class="label">Total Entries</div>
                     </div>
+                    <div class="chart-stat">
+                        <div class="number">
+                            <?php echo count(array_unique(array_column($chart_data_display, 'game_name'))); ?>
+                        </div>
+                        <div class="label">Unique Games</div>
+                    </div>
+                    <div class="chart-stat">
+                        <div class="number"><?php echo count(array_unique(array_column($chart_data_display, 'date'))); ?>
+                        </div>
+                        <div class="label">Unique Dates</div>
+                    </div>
+                </div>
             <?php endif; ?>
 
             <div class="admin-table-wrapper">
@@ -1071,27 +1164,38 @@ require_once 'header.php';
                     </thead>
                     <tbody>
                         <?php if (empty($chart_data_display)): ?>
+                            <tr>
+                                <td colspan="6" style="padding: 30px; text-align: center; color: #999;">
+                                    No chart data found. Add some data using the forms above.
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($chart_data_display as $row): ?>
                                 <tr>
-                                    <td colspan="6" style="padding: 30px; text-align: center; color: #999;">
-                                        No chart data found. Add some data using the forms above.
+                                    <td><?php echo $row['id']; ?></td>
+                                    <td><strong><?php echo ucfirst($row['game_name']); ?></strong></td>
+                                    <td><?php echo $row['date']; ?></td>
+                                    <td style="font-weight: bold; color: #c49a00; font-size: 18px;">
+                                        <?php echo $row['result_number'] ?: '--'; ?>
+                                    </td>
+                                    <td><span
+                                            style="background: <?php echo $row['table_type'] === 'table1' ? '#ffd700' : '#17a2b8'; ?>; color: #000; padding: 2px 10px; border-radius: 10px; font-size: 11px;"><?php echo $row['table_type']; ?></span>
+                                    </td>
+                                    <td>
+                                        <div class="actions-cell">
+                                            <a href="admin-dashboard.php?tab=chart&edit_game=<?php echo urlencode($row['game_name']); ?>&edit_date=<?php echo urlencode($row['date']); ?>&edit_result=<?php echo urlencode($row['result_number']); ?>&edit_table=<?php echo urlencode($row['table_type']); ?>"
+                                                class="btn-edit"
+                                                style="padding: 5px 12px; border-radius: 5px; text-decoration: none; display: inline-block;">✏️
+                                                Edit</a>
+                                            <a href="?delete_chart=<?php echo urlencode($row['game_name']); ?>&chart_date=<?php echo urlencode($row['date']); ?>&chart_table_type=<?php echo urlencode($row['table_type']); ?>"
+                                                class="btn-delete"
+                                                onclick="return confirm('Delete chart data for <?php echo ucfirst($row['game_name']); ?> on <?php echo $row['date']; ?>?')"
+                                                style="padding: 5px 12px; border-radius: 5px; text-decoration: none; display: inline-block;">🗑️
+                                                Delete</a>
+                                        </div>
                                     </td>
                                 </tr>
-                        <?php else: ?>
-                                <?php foreach ($chart_data_display as $row): ?>
-                                        <tr>
-                                            <td><?php echo $row['id']; ?></td>
-                                            <td><strong><?php echo ucfirst($row['game_name']); ?></strong></td>
-                                            <td><?php echo $row['date']; ?></td>
-                                            <td style="font-weight: bold; color: #c49a00; font-size: 18px;"><?php echo $row['result_number'] ?: '--'; ?></td>
-                                            <td><span style="background: <?php echo $row['table_type'] === 'table1' ? '#ffd700' : '#17a2b8'; ?>; color: #000; padding: 2px 10px; border-radius: 10px; font-size: 11px;"><?php echo $row['table_type']; ?></span></td>
-                                            <td>
-                                                <div class="actions-cell">
-                                                    <a href="admin-dashboard.php?tab=chart&edit_game=<?php echo urlencode($row['game_name']); ?>&edit_date=<?php echo urlencode($row['date']); ?>&edit_result=<?php echo urlencode($row['result_number']); ?>&edit_table=<?php echo urlencode($row['table_type']); ?>" class="btn-edit" style="padding: 5px 12px; border-radius: 5px; text-decoration: none; display: inline-block;">✏️ Edit</a>
-                                                    <a href="?delete_chart=<?php echo urlencode($row['game_name']); ?>&chart_date=<?php echo urlencode($row['date']); ?>&chart_table_type=<?php echo urlencode($row['table_type']); ?>" class="btn-delete" onclick="return confirm('Delete chart data for <?php echo ucfirst($row['game_name']); ?> on <?php echo $row['date']; ?>?')" style="padding: 5px 12px; border-radius: 5px; text-decoration: none; display: inline-block;">🗑️ Delete</a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                <?php endforeach; ?>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -1100,12 +1204,12 @@ require_once 'header.php';
     </div>
 
     <!-- ==================== TAB 3: TIMINGS ==================== -->
-    <div id="tab-timings" class="tab-content <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'timings') ? 'active' : ''; ?>">
+    <div id="tab-timings" class="tab-content <?php echo $current_tab === 'timings' ? 'active' : ''; ?>">
         <div class="admin-section">
             <h2>⏰ Manage Game Timings</h2>
 
-            <!-- Add Timing -->
-            <form method="POST" class="admin-form" style="margin-bottom: 20px; padding: 20px; background: #f9f9f9; border-radius: 15px;">
+            <form method="POST" class="admin-form"
+                style="margin-bottom: 20px; padding: 20px; background: #f9f9f9; border-radius: 15px;">
                 <input type="hidden" name="add_timing" value="1">
                 <h3 style="width:100%; margin-bottom:15px; font-size:16px;">Add New Timing</h3>
                 <div class="form-group">
@@ -1123,7 +1227,6 @@ require_once 'header.php';
                 <button type="submit" class="btn-success">➕ Add Timing</button>
             </form>
 
-            <!-- Timings List -->
             <div class="admin-table-wrapper">
                 <table class="admin-table">
                     <thead>
@@ -1138,30 +1241,35 @@ require_once 'header.php';
                     </thead>
                     <tbody>
                         <?php if (empty($game_timings)): ?>
-                                <tr>
-                                    <td colspan="6" style="padding:30px; color:#999;">No timings added yet.</td>
-                                </tr>
+                            <tr>
+                                <td colspan="6" style="padding:30px; color:#999;">No timings added yet.</td>
+                            </tr>
                         <?php else: ?>
-                                <?php foreach ($game_timings as $timing): ?>
-                                        <tr>
-                                            <td><?php echo $timing['id']; ?></td>
-                                            <td><strong><?php echo ucfirst($timing['game_name']); ?></strong></td>
-                                            <td><?php echo $timing['timing']; ?></td>
-                                            <td style="font-size:24px;"><?php echo $timing['emoji']; ?></td>
-                                            <td>
-                                                <span style="color: <?php echo $timing['is_active'] ? '#28a745' : '#dc3545'; ?>;">
-                                                    <?php echo $timing['is_active'] ? '✅ Active' : '❌ Inactive'; ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="actions-cell">
-                                                    <button class="btn-edit" onclick="openTimingEditModal(<?php echo $timing['id']; ?>, '<?php echo $timing['game_name']; ?>', '<?php echo $timing['timing']; ?>', '<?php echo $timing['emoji']; ?>', <?php echo $timing['is_active']; ?>)">✏️ Edit</button>
-                                                    <a href="?toggle_timing=<?php echo $timing['id']; ?>" class="btn-toggle <?php echo $timing['is_active'] ? 'active' : ''; ?>">🔄 Toggle</a>
-                                                    <a href="?delete_timing=<?php echo $timing['id']; ?>" class="btn-delete" onclick="return confirm('Delete this timing?')">🗑️ Delete</a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                <?php endforeach; ?>
+                            <?php foreach ($game_timings as $timing): ?>
+                                <tr>
+                                    <td><?php echo $timing['id']; ?></td>
+                                    <td><strong><?php echo ucfirst($timing['game_name']); ?></strong></td>
+                                    <td><?php echo $timing['timing']; ?></td>
+                                    <td style="font-size:24px;"><?php echo $timing['emoji']; ?></td>
+                                    <td>
+                                        <span style="color: <?php echo $timing['is_active'] ? '#28a745' : '#dc3545'; ?>;">
+                                            <?php echo $timing['is_active'] ? '✅ Active' : '❌ Inactive'; ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="actions-cell">
+                                            <button class="btn-edit"
+                                                onclick="openTimingEditModal(<?php echo $timing['id']; ?>, '<?php echo $timing['game_name']; ?>', '<?php echo $timing['timing']; ?>', '<?php echo $timing['emoji']; ?>', <?php echo $timing['is_active']; ?>)">✏️
+                                                Edit</button>
+                                            <a href="?toggle_timing=<?php echo $timing['id']; ?>"
+                                                class="btn-toggle <?php echo $timing['is_active'] ? 'active' : ''; ?>">🔄
+                                                Toggle</a>
+                                            <a href="?delete_timing=<?php echo $timing['id']; ?>" class="btn-delete"
+                                                onclick="return confirm('Delete this timing?')">🗑️ Delete</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -1170,12 +1278,12 @@ require_once 'header.php';
     </div>
 
     <!-- ==================== TAB 4: RATES ==================== -->
-    <div id="tab-rates" class="tab-content <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'rates') ? 'active' : ''; ?>">
+    <div id="tab-rates" class="tab-content <?php echo $current_tab === 'rates' ? 'active' : ''; ?>">
         <div class="admin-section">
             <h2>💰 Manage Game Rates</h2>
 
-            <!-- Add Rate -->
-            <form method="POST" class="admin-form" style="margin-bottom: 20px; padding: 20px; background: #f9f9f9; border-radius: 15px;">
+            <form method="POST" class="admin-form"
+                style="margin-bottom: 20px; padding: 20px; background: #f9f9f9; border-radius: 15px;">
                 <input type="hidden" name="add_rate" value="1">
                 <h3 style="width:100%; margin-bottom:15px; font-size:16px;">Add New Rate</h3>
                 <div class="form-group">
@@ -1193,7 +1301,6 @@ require_once 'header.php';
                 <button type="submit" class="btn-success">➕ Add Rate</button>
             </form>
 
-            <!-- Rates List -->
             <div class="admin-table-wrapper">
                 <table class="admin-table">
                     <thead>
@@ -1208,30 +1315,35 @@ require_once 'header.php';
                     </thead>
                     <tbody>
                         <?php if (empty($game_rates)): ?>
-                                <tr>
-                                    <td colspan="6" style="padding:30px; color:#999;">No rates added yet.</td>
-                                </tr>
+                            <tr>
+                                <td colspan="6" style="padding:30px; color:#999;">No rates added yet.</td>
+                            </tr>
                         <?php else: ?>
-                                <?php foreach ($game_rates as $rate): ?>
-                                        <tr>
-                                            <td><?php echo $rate['id']; ?></td>
-                                            <td><strong><?php echo $rate['rate_type']; ?></strong></td>
-                                            <td><?php echo $rate['rate_value']; ?></td>
-                                            <td><?php echo $rate['display_order']; ?></td>
-                                            <td>
-                                                <span style="color: <?php echo $rate['is_active'] ? '#28a745' : '#dc3545'; ?>;">
-                                                    <?php echo $rate['is_active'] ? '✅ Active' : '❌ Inactive'; ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="actions-cell">
-                                                    <button class="btn-edit" onclick="openRateEditModal(<?php echo $rate['id']; ?>, '<?php echo $rate['rate_type']; ?>', '<?php echo $rate['rate_value']; ?>', <?php echo $rate['is_active']; ?>)">✏️ Edit</button>
-                                                    <a href="?toggle_rate=<?php echo $rate['id']; ?>" class="btn-toggle <?php echo $rate['is_active'] ? 'active' : ''; ?>">🔄 Toggle</a>
-                                                    <a href="?delete_rate=<?php echo $rate['id']; ?>" class="btn-delete" onclick="return confirm('Delete this rate?')">🗑️ Delete</a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                <?php endforeach; ?>
+                            <?php foreach ($game_rates as $rate): ?>
+                                <tr>
+                                    <td><?php echo $rate['id']; ?></td>
+                                    <td><strong><?php echo $rate['rate_type']; ?></strong></td>
+                                    <td><?php echo $rate['rate_value']; ?></td>
+                                    <td><?php echo $rate['display_order']; ?></td>
+                                    <td>
+                                        <span style="color: <?php echo $rate['is_active'] ? '#28a745' : '#dc3545'; ?>;">
+                                            <?php echo $rate['is_active'] ? '✅ Active' : '❌ Inactive'; ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="actions-cell">
+                                            <button class="btn-edit"
+                                                onclick="openRateEditModal(<?php echo $rate['id']; ?>, '<?php echo $rate['rate_type']; ?>', '<?php echo $rate['rate_value']; ?>', <?php echo $rate['is_active']; ?>)">✏️
+                                                Edit</button>
+                                            <a href="?toggle_rate=<?php echo $rate['id']; ?>"
+                                                class="btn-toggle <?php echo $rate['is_active'] ? 'active' : ''; ?>">🔄
+                                                Toggle</a>
+                                            <a href="?delete_rate=<?php echo $rate['id']; ?>" class="btn-delete"
+                                                onclick="return confirm('Delete this rate?')">🗑️ Delete</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -1240,12 +1352,12 @@ require_once 'header.php';
     </div>
 
     <!-- ==================== TAB 5: MULTIPLE RESULTS ==================== -->
-    <div id="tab-multiple" class="tab-content <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'multiple') ? 'active' : ''; ?>">
+    <div id="tab-multiple" class="tab-content <?php echo $current_tab === 'multiple' ? 'active' : ''; ?>">
         <div class="admin-section">
             <h2>📝 Manage Multiple Results</h2>
 
-            <!-- Add Result -->
-            <form method="POST" class="admin-form" style="margin-bottom: 20px; padding: 20px; background: #f9f9f9; border-radius: 15px;">
+            <form method="POST" class="admin-form"
+                style="margin-bottom: 20px; padding: 20px; background: #f9f9f9; border-radius: 15px;">
                 <input type="hidden" name="add_multiple_result" value="1">
                 <h3 style="width:100%; margin-bottom:15px; font-size:16px;">Add New Result</h3>
                 <div class="form-group">
@@ -1267,7 +1379,6 @@ require_once 'header.php';
                 <button type="submit" class="btn-success">➕ Add Result</button>
             </form>
 
-            <!-- Results List -->
             <div class="admin-table-wrapper">
                 <table class="admin-table">
                     <thead>
@@ -1282,25 +1393,30 @@ require_once 'header.php';
                     </thead>
                     <tbody>
                         <?php if (empty($multiple_results)): ?>
-                                <tr>
-                                    <td colspan="6" style="padding:30px; color:#999;">No results added yet.</td>
-                                </tr>
+                            <tr>
+                                <td colspan="6" style="padding:30px; color:#999;">No results added yet.</td>
+                            </tr>
                         <?php else: ?>
-                                <?php foreach ($multiple_results as $result): ?>
-                                        <tr>
-                                            <td><?php echo $result['id']; ?></td>
-                                            <td><strong><?php echo ucfirst($result['game_name']); ?></strong></td>
-                                            <td><?php echo $result['result_date']; ?></td>
-                                            <td style="font-weight:bold; color:#c49a00; font-size:18px;"><?php echo $result['result_number']; ?></td>
-                                            <td><?php echo $result['result_time'] ?: '--'; ?></td>
-                                            <td>
-                                                <div class="actions-cell">
-                                                    <button class="btn-edit" onclick="openMultipleResultEditModal(<?php echo $result['id']; ?>, '<?php echo $result['game_name']; ?>', '<?php echo $result['result_date']; ?>', '<?php echo $result['result_number']; ?>', '<?php echo $result['result_time']; ?>')">✏️ Edit</button>
-                                                    <a href="?delete_multiple_result=<?php echo $result['id']; ?>" class="btn-delete" onclick="return confirm('Delete this result?')">🗑️ Delete</a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                <?php endforeach; ?>
+                            <?php foreach ($multiple_results as $result): ?>
+                                <tr>
+                                    <td><?php echo $result['id']; ?></td>
+                                    <td><strong><?php echo ucfirst($result['game_name']); ?></strong></td>
+                                    <td><?php echo $result['result_date']; ?></td>
+                                    <td style="font-weight:bold; color:#c49a00; font-size:18px;">
+                                        <?php echo $result['result_number']; ?>
+                                    </td>
+                                    <td><?php echo $result['result_time'] ?: '--'; ?></td>
+                                    <td>
+                                        <div class="actions-cell">
+                                            <button class="btn-edit"
+                                                onclick="openMultipleResultEditModal(<?php echo $result['id']; ?>, '<?php echo $result['game_name']; ?>', '<?php echo $result['result_date']; ?>', '<?php echo $result['result_number']; ?>', '<?php echo $result['result_time']; ?>')">✏️
+                                                Edit</button>
+                                            <a href="?delete_multiple_result=<?php echo $result['id']; ?>" class="btn-delete"
+                                                onclick="return confirm('Delete this result?')">🗑️ Delete</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -1439,11 +1555,6 @@ require_once 'header.php';
 
 <!-- JavaScript -->
 <script>
-    // Tab switching - Updated to work with URL
-    function showTab(tabName) {
-        window.location.href = 'admin-dashboard.php?tab=' + tabName;
-    }
-
     // Edit Game Modal
     function openEditModal(game, yesterday, today, time, displayName) {
         document.getElementById('editGameName').value = game;
@@ -1500,14 +1611,14 @@ require_once 'header.php';
     }
 
     // Close modals when clicking outside
-    window.onclick = function(event) {
+    window.onclick = function (event) {
         if (event.target.classList.contains('modal')) {
             event.target.style.display = 'none';
         }
     }
 
     // Close modals with Escape key
-    document.addEventListener('keydown', function(event) {
+    document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             document.querySelectorAll('.modal').forEach(el => {
                 el.style.display = 'none';
@@ -1516,4 +1627,4 @@ require_once 'header.php';
     });
 </script>
 
-<?php require_once 'footer.php'; ?>
+<?

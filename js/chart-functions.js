@@ -17,7 +17,7 @@ function loadChartData() {
   // Show loading state
   container.style.display = "block";
   display.innerHTML = `
-        <div style="text-align: center; padding: 60px 20px; color: #999;">
+        <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; border-radius: 15px; border: 2px dashed #ccc;">
             <div style="font-size: 48px; margin-bottom: 20px;">⏳</div>
             <div style="font-size: 18px;">Loading chart data for ${game.toUpperCase()}...</div>
         </div>
@@ -122,33 +122,13 @@ function renderChartTable(data, game, year, month) {
 
   // Build table
   let html = `
-        <!-- Statistics Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Total Entries</div>
-                <div style="font-size: 28px; font-weight: bold;">${data.length}</div>
-            </div>
-            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: #fff; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Highest</div>
-                <div style="font-size: 28px; font-weight: bold;">${max}</div>
-            </div>
-            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: #fff; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Lowest</div>
-                <div style="font-size: 28px; font-weight: bold;">${min}</div>
-            </div>
-            <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #1a1a2e; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Average</div>
-                <div style="font-size: 28px; font-weight: bold;">${avg}</div>
-            </div>
-        </div>
-        
         <!-- Chart Table -->
         <div style="overflow-x: auto; background: #fff; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.08);">
             <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                 <thead>
                     <tr style="background: #1a1a2e; color: #ffd700;">
-                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">📅 Date</th>
-                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">🎯 Result</th>
+                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">Date</th>
+                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">Result</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -171,7 +151,7 @@ function renderChartTable(data, game, year, month) {
                 </td>
                 <td style="padding: 12px 15px; text-align: center; font-size: 24px; font-weight: bold; color: ${resultColor};">
                     ${item.result_number || "--"}
-                    ${item.result_number ? (isHigh ? " 🔥" : "") : ""}
+                    ${item.result_number ? (isHigh ? " " : "") : ""}
                 </td>
             </tr>
         `;

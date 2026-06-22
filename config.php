@@ -102,24 +102,34 @@ function getChartData($pdo, $game_name, $date, $table_type)
 
 function getAllChartData($pdo, $table_type = null)
 {
-    $sql = "SELECT * FROM chart_data";
-    if ($table_type) {
-        $sql .= " WHERE table_type = ? ORDER BY date, game_name";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$table_type]);
-    } else {
-        $sql .= " ORDER BY date, game_name";
-        $stmt = $pdo->query($sql);
+    try {
+        if ($table_type) {
+            $sql = "SELECT * FROM chart_data WHERE table_type = ? ORDER BY date DESC, game_name ASC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$table_type]);
+        } else {
+            $sql = "SELECT * FROM chart_data ORDER BY date DESC, game_name ASC";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute();
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error in getAllChartData: " . $e->getMessage());
+        return [];
     }
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function updateChartData($pdo, $game_name, $date, $result, $table_type)
 {
-    $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) 
-                           VALUES (?, ?, ?, ?) 
-                           ON DUPLICATE KEY UPDATE result_number = VALUES(result_number)");
-    return $stmt->execute([$game_name, $date, $result, $table_type]);
+    try {
+        $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) 
+                               VALUES (?, ?, ?, ?) 
+                               ON DUPLICATE KEY UPDATE result_number = VALUES(result_number)");
+        return $stmt->execute([$game_name, $date, $result, $table_type]);
+    } catch (PDOException $e) {
+        error_log("Error in updateChartData: " . $e->getMessage());
+        return false;
+    }
 }
 
 function deleteChartData($pdo, $game_name, $date, $table_type)
@@ -141,6 +151,85 @@ function getChartDates($pdo, $table_type = null)
     $dates = $stmt->fetchAll(PDO::FETCH_COLUMN);
     sort($dates);
     return $dates;
+}
+
+// ============ GAME CHART DATA FOR DEDICATED PAGES ============
+function getGameChartData($pdo, $game_name, $year, $month)
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT result_date, result_number 
+            FROM game_results_history 
+            WHERE game_name = :game_name 
+            AND YEAR(result_date) = :year 
+            AND MONTH(result_date) = :month 
+            ORDER BY result_date DESC
+        ");
+        $stmt->execute([
+            'game_name' => $game_name,
+            'year' => $year,
+            'month' => $month
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error fetching game chart data: " . $e->getMessage());
+        return [];
+    }
+}
+
+function getGameTiming($pdo, $game_name)
+{
+    try {
+        $stmt = $pdo->prepare("SELECT timing FROM game_timings WHERE game_name = :game_name AND is_active = 1 LIMIT 1");
+        $stmt->execute(['game_name' => $game_name]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? $result['timing'] : null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+function getGameInfo($pdo, $game_name)
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT gr.*, gt.timing 
+            FROM game_results gr 
+            LEFT JOIN game_timings gt ON gr.game_name = gt.game_name AND gt.is_active = 1 
+            WHERE gr.game_name = :game_name 
+            LIMIT 1
+        ");
+        $stmt->execute(['game_name' => $game_name]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error fetching game info: " . $e->getMessage());
+        return null;
+    }
+}
+
+function getAllChartDataForGame($pdo, $game_name, $table_type = null)
+{
+    try {
+        $sql = "SELECT date, result_number, table_type 
+                FROM chart_data 
+                WHERE game_name = :game_name";
+
+        $params = ['game_name' => $game_name];
+
+        if ($table_type) {
+            $sql .= " AND table_type = :table_type";
+            $params['table_type'] = $table_type;
+        }
+
+        $sql .= " ORDER BY date DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error fetching chart data for game: " . $e->getMessage());
+        return [];
+    }
 }
 
 // ============ GAME TIMINGS CRUD ============
@@ -180,7 +269,7 @@ function toggleGameTiming($pdo, $id, $is_active)
     return $stmt->execute([$is_active, $id]);
 }
 
-// ============ MULTIPLE RESULTS CRUD (FIXED) ============
+// ============ MULTIPLE RESULTS CRUD ============
 function getGameMultipleResults($pdo, $game_name = null, $limit = null)
 {
     $sql = "SELECT * FROM game_multiple_results";

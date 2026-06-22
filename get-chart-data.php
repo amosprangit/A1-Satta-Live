@@ -3,52 +3,74 @@ require_once 'config.php';
 
 header('Content-Type: application/json');
 
-$game = $_POST['game'] ?? '';
-$year = $_POST['year'] ?? date('Y');
-$month = $_POST['month'] ?? date('m');
+$game = trim($_POST['game'] ?? '');
+$year = trim($_POST['year'] ?? date('Y'));
+$month = trim($_POST['month'] ?? date('m'));
 
 if (empty($game)) {
-    echo json_encode(['success' => false, 'message' => 'Game name is required']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Game name is required'
+    ]);
     exit();
 }
 
 try {
-    // Debug: Log the search parameters
-    error_log("Searching for: game=$game, month=$month, year=$year");
 
-    // Get chart data for the selected game and month
-    // The date format in DB is like "01-06" (DD-MM)
-    $search_pattern = $month . '-' . $year;
+    error_log("Chart Search => Game: $game | Month: $month | Year: $year");
 
-    $stmt = $pdo->prepare("SELECT * FROM chart_data 
-                           WHERE game_name = ? 
-                           AND date LIKE ? 
-                           ORDER BY date ASC");
-    $stmt->execute([$game, $search_pattern . '%']);
+    /*
+     * Database date format:
+     * 01-06
+     * 02-06
+     * 03-06
+     * etc.
+     *
+     * Therefore we search by month only:
+     * %-06
+     */
+
+    $stmt = $pdo->prepare("
+        SELECT *
+        FROM chart_data
+        WHERE TRIM(game_name) = TRIM(?)
+        AND date LIKE ?
+        ORDER BY CAST(SUBSTRING_INDEX(date,'-',1) AS UNSIGNED) ASC
+    ");
+
+    $stmt->execute([
+        $game,
+        '%-' . $month
+    ]);
+
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Debug: Log results count
-    error_log("Found " . count($results) . " results for game=$game, pattern=$search_pattern%");
+    error_log("Chart Results Found: " . count($results));
 
     if (empty($results)) {
-        // Try without the year to see if data exists with different year
-        $stmt2 = $pdo->prepare("SELECT * FROM chart_data WHERE game_name = ? ORDER BY date ASC");
-        $stmt2->execute([$game]);
-        $all_results = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
-        if (!empty($all_results)) {
-            // Data exists but not for this month/year
+        // Debug check if game exists at all
+        $checkStmt = $pdo->prepare("
+            SELECT COUNT(*) as total
+            FROM chart_data
+            WHERE TRIM(game_name) = TRIM(?)
+        ");
+
+        $checkStmt->execute([$game]);
+        $gameExists = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($gameExists['total'] > 0) {
             echo json_encode([
                 'success' => false,
-                'message' => 'No chart data found for ' . strtoupper($game) . ' in ' . $month . '-' . $year . '. Data exists for other dates.'
+                'message' => 'Data exists for this game but not for selected month.'
             ]);
-            exit();
+        } else {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No chart data found for ' . strtoupper($game)
+            ]);
         }
 
-        echo json_encode([
-            'success' => false,
-            'message' => 'No chart data found for ' . strtoupper($game)
-        ]);
         exit();
     }
 
@@ -56,12 +78,19 @@ try {
         'success' => true,
         'data' => $results,
         'game' => $game,
+        'month' => $month,
         'year' => $year,
-        'month' => $month
+        'total_records' => count($results)
     ]);
 
 } catch (PDOException $e) {
-    error_log("Database error: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+
+    error_log("Chart Data Error: " . $e->getMessage());
+
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database Error',
+        'error' => $e->getMessage()
+    ]);
 }
 ?>
