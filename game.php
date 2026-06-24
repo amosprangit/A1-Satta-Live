@@ -16,27 +16,35 @@ if (empty($game_slug)) {
 // Convert slug back to game name
 $game_name = str_replace('-', ' ', $game_slug);
 
-// Check if game exists in database directly
-$game_result = getGameResults($pdo, $game_name);
+// Fetch game data directly from database
+try {
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = LOWER(?)");
+    $stmt->execute([$game_name]);
+    $game_result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// If game not found in database, redirect to home
-if (!$game_result) {
-    // Try case-insensitive search
-    $all_game_names = getGameNames($pdo);
-    $found = false;
-    foreach ($all_game_names as $db_game) {
-        if (strtolower($db_game) === strtolower($game_name)) {
-            $game_name = $db_game;
-            $game_result = getGameResults($pdo, $game_name);
-            $found = true;
-            break;
+    // If not found, try case-insensitive
+    if (!$game_result) {
+        $stmt = $pdo->query("SELECT game_name FROM game_results");
+        $all_games = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $found = false;
+        foreach ($all_games as $db_game) {
+            if (strtolower($db_game) === strtolower($game_name)) {
+                $game_name = $db_game;
+                $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = ?");
+                $stmt->execute([$game_name]);
+                $game_result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            header('Location: /');
+            exit;
         }
     }
-
-    if (!$found) {
-        header('Location: /');
-        exit;
-    }
+} catch (PDOException $e) {
+    header('Location: /');
+    exit;
 }
 
 // Get game data
@@ -44,13 +52,26 @@ $current_result = $game_result['today_result'] ?? 'WAIT';
 $yesterday_result = $game_result['yesterday_result'] ?? '--';
 $result_time = $game_result['result_time'] ?? '';
 $display_name = !empty($game_result['display_name']) ? $game_result['display_name'] : strtoupper($game_name);
-$table_type = $game_result['table_type'] ?? '1';
+$table_type = $game_result['table_type'] ?? 'table1';
 
-// Get game timing from game_timings table
-$game_timing = getGameTiming($pdo, $game_name);
+// Get game timing
+try {
+    $stmt = $pdo->prepare("SELECT timing FROM game_timings WHERE LOWER(game_name) = LOWER(?) AND is_active = 1 LIMIT 1");
+    $stmt->execute([$game_name]);
+    $timing_row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $game_timing = $timing_row ? $timing_row['timing'] : $result_time;
+} catch (PDOException $e) {
+    $game_timing = $result_time;
+}
 
-// Get all chart data for this game from chart_data table
-$chart_data = getAllChartDataForGame($pdo, $game_name, $table_type);
+// Get all chart data for this game
+try {
+    $stmt = $pdo->prepare("SELECT date, result_number FROM chart_data WHERE LOWER(game_name) = LOWER(?) ORDER BY STR_TO_DATE(date, '%d-%m') DESC");
+    $stmt->execute([$game_name]);
+    $chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $chart_data = [];
+}
 
 // Set page title
 $page_title = strtoupper($display_name) . ' Satta King Results Chart | A1 Satta Live';
@@ -58,55 +79,357 @@ $page_title = strtoupper($display_name) . ' Satta King Results Chart | A1 Satta 
 require_once 'header.php';
 ?>
 
-<link rel="stylesheet" href="./css/style.css">
+<style>
+    .game-page-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 15px;
+    }
 
-<!-- Game Header -->
-<div class="live-box">
-    <h1><?php echo strtoupper($display_name); ?></h1>
-</div>
+    .game-header-box {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        color: #ffd700;
+        padding: 25px 20px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
 
-<!-- Chart Results Table -->
-<div class="table-wrapper" style="margin: 30px 0;">
-    <div style="text-align:center; margin:20px;">
-        <h2 style="color:#ffd700; font-size: 24px;"><?php echo strtoupper($display_name); ?> - ALL RESULTS CHART</h2>
+    .game-header-box h1 {
+        font-size: clamp(24px, 5vw, 36px);
+        margin: 0 0 5px 0;
+        letter-spacing: 2px;
+    }
+
+    .game-header-box .game-time {
+        font-size: 16px;
+        color: #ddd;
+        margin-top: 5px;
+    }
+
+    .game-info-card {
+        background: #fff;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .game-info-item {
+        flex: 1;
+        min-width: 120px;
+    }
+
+    .game-info-item .label {
+        color: #666;
+        font-size: 13px;
+        margin-bottom: 5px;
+    }
+
+    .game-info-item .value {
+        font-size: clamp(18px, 4vw, 28px);
+        font-weight: bold;
+        color: #1a1a2e;
+    }
+
+    .game-info-item .value.result {
+        color: #c49a00;
+        font-size: clamp(24px, 5vw, 36px);
+    }
+
+    .chart-section {
+        background: #fff;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+    }
+
+    .chart-section h2 {
+        text-align: center;
+        color: #1a1a2e;
+        margin: 0 0 20px 0;
+        font-size: clamp(18px, 3vw, 24px);
+        border-bottom: 2px solid #ffd700;
+        padding-bottom: 10px;
+    }
+
+    .chart-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .chart-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 500px;
+    }
+
+    .chart-table th {
+        background: #1e1e2a;
+        color: #ffd700;
+        padding: 12px 15px;
+        font-size: 14px;
+        font-weight: bold;
+        text-align: center;
+        border: 1px solid #333;
+        white-space: nowrap;
+    }
+
+    .chart-table td {
+        border: 1px solid #ddd;
+        padding: 10px 15px;
+        text-align: center;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .chart-table tbody tr:hover {
+        background: #fff8e0;
+    }
+
+    .chart-table tbody tr:nth-child(even) {
+        background: #fafafa;
+    }
+
+    .chart-table tbody tr:nth-child(even):hover {
+        background: #fff8e0;
+    }
+
+    .date-col {
+        font-weight: bold;
+        color: #1a1a2e;
+        white-space: nowrap;
+    }
+
+    .day-col {
+        color: #666;
+    }
+
+    .result-box {
+        background: #1e1e2a;
+        display: inline-block;
+        padding: 5px 18px;
+        border-radius: 20px;
+        color: #ffd966;
+        font-weight: bold;
+        font-size: 16px;
+        min-width: 50px;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+    }
+
+    .no-data .icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .no-data .text {
+        font-size: 18px;
+        margin-bottom: 5px;
+    }
+
+    .no-data .subtext {
+        font-size: 14px;
+    }
+
+    .back-btn {
+        display: inline-block;
+        padding: 10px 25px;
+        background: #6c757d;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 30px;
+        font-weight: bold;
+        font-size: 14px;
+        transition: 0.3s;
+    }
+
+    .back-btn:hover {
+        background: #5a6268;
+        color: #fff;
+    }
+
+    .footer {
+        background: #000;
+        text-align: center;
+        padding: 20px;
+        border-top: 1px solid #333;
+        margin-top: 20px;
+    }
+
+    .footer a {
+        color: #ffd700;
+        text-decoration: none;
+        margin: 0 15px;
+        font-size: 14px;
+    }
+
+    .footer p {
+        color: #666;
+        margin-top: 15px;
+        font-size: 12px;
+    }
+
+    .disclaimer {
+        background: #111;
+        padding: 15px;
+        text-align: center;
+        font-size: 11px;
+        color: #888;
+        line-height: 1.5;
+    }
+
+    @media (max-width: 768px) {
+        .game-page-container {
+            padding: 10px;
+        }
+
+        .chart-table th,
+        .chart-table td {
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+
+        .result-box {
+            padding: 4px 12px;
+            font-size: 14px;
+        }
+
+        .game-info-card {
+            gap: 10px;
+        }
+
+        .footer a {
+            margin: 0 8px;
+            font-size: 12px;
+        }
+    }
+
+    @media (max-width: 480px) {
+
+        .chart-table th,
+        .chart-table td {
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+
+        .result-box {
+            padding: 3px 10px;
+            font-size: 12px;
+        }
+
+        .game-header-box h1 {
+            font-size: 20px;
+        }
+    }
+</style>
+
+<div class="game-page-container">
+
+    <!-- Game Header -->
+    <div class="game-header-box">
+        <h1><?php echo htmlspecialchars(strtoupper($display_name)); ?></h1>
+        <div class="game-time">⏰ Result Time: <?php echo htmlspecialchars($game_timing ?: 'N/A'); ?></div>
     </div>
 
-    <table class="result-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Day</th>
-                <th>Result</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (!empty($chart_data)): ?>
-                <?php foreach ($chart_data as $row):
-                    $result_date = $row['date'];
-                    $result_number = $row['result_number'];
-                    $day_name = date('l', strtotime($result_date));
-                    ?>
+    <!-- Game Info Cards -->
+    <div class="game-info-card">
+        <div class="game-info-item">
+            <div class="label">Yesterday Result</div>
+            <div class="value"><?php echo htmlspecialchars($yesterday_result); ?></div>
+        </div>
+        <div class="game-info-item">
+            <div class="label">Today Result</div>
+            <div class="value result">
+                <?php if ($current_result == 'WAIT' || $current_result == '-1' || empty($current_result)): ?>
+                    <span style="color: #d32f2f; font-size: 18px;">⏳ WAIT</span>
+                <?php else: ?>
+                    <?php echo htmlspecialchars($current_result); ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="game-info-item">
+            <div class="label">Total Results</div>
+            <div class="value"><?php echo count($chart_data); ?></div>
+        </div>
+    </div>
+
+    <!-- Chart Results Table -->
+    <div class="chart-section">
+        <h2>📊 <?php echo htmlspecialchars(strtoupper($display_name)); ?> - ALL RESULTS CHART</h2>
+
+        <div class="chart-table-wrapper">
+            <table class="chart-table">
+                <thead>
                     <tr>
-                        <td class="game-name"><?php echo date('d M Y', strtotime($result_date)); ?></td>
-                        <td class="yesterday-result"><?php echo $day_name; ?></td>
-                        <td class="today-result">
-                            <span class="result-value"><?php echo $result_number; ?></span>
-                        </td>
+                        <th>Date</th>
+                        <th>Day</th>
+                        <th>Result</th>
                     </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr>
-                    <td colspan="3" style="text-align: center; padding: 40px; color: #999;">
-                        <div style="font-size: 48px; margin-bottom: 10px;">📊</div>
-                        <div style="font-size: 18px;">No results data available yet</div>
-                        <div style="font-size: 14px; margin-top: 5px;">Check back later for updated results</div>
-                    </td>
-                </tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                </thead>
+                <tbody>
+                    <?php if (!empty($chart_data)): ?>
+                        <?php foreach ($chart_data as $row):
+                            // Parse date from DD-MM format
+                            $date_parts = explode('-', $row['date']);
+                            if (count($date_parts) == 2) {
+                                $day_num = intval($date_parts[0]);
+                                $month_num = intval($date_parts[1]);
+                                $year = date('Y');
+                                $timestamp = mktime(0, 0, 0, $month_num, $day_num, $year);
+                                $date_formatted = date('d M Y', $timestamp);
+                                $day_name = date('l', $timestamp);
+                            } else {
+                                $date_formatted = $row['date'];
+                                $day_name = '--';
+                            }
+                            $result_number = $row['result_number'];
+                            ?>
+                            <tr>
+                                <td class="date-col"><?php echo $date_formatted; ?></td>
+                                <td class="day-col"><?php echo $day_name; ?></td>
+                                <td>
+                                    <span class="result-box">
+                                        <?php echo htmlspecialchars($result_number ?: '--'); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="3">
+                                <div class="no-data">
+                                    <div class="icon">📊</div>
+                                    <div class="text">No results data available yet</div>
+                                    <div class="subtext">Check back later for updated results</div>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div style="text-align: center; margin: 20px 0;">
+        <a href="index.php" class="back-btn">🏠 BACK TO HOME</a>
+        <a href="chart.php" class="back-btn" style="margin-left: 10px;">📊 VIEW ALL CHARTS</a>
+    </div>
+
 </div>
 
+<!-- Footer -->
 <div class="footer">
     <a href="/privacy-policy">Privacy Policy</a>
     <a href="/terms-and-conditions">Terms & Conditions</a>
@@ -121,4 +444,4 @@ require_once 'header.php';
     You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
 </div>
 
-<?
+<?php require_once 'footer.php'; ?>

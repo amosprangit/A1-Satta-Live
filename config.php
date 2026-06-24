@@ -60,6 +60,28 @@ function getAllGames($pdo)
     return $results;
 }
 
+function getWebsiteContent($pdo, $key)
+{
+    try {
+        $stmt = $pdo->prepare("SELECT content_value FROM website_content WHERE content_key = ?");
+        $stmt->execute([$key]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $row['content_value'] : null;
+    } catch (PDOException $e) {
+        return null;
+    }
+}
+
+function updateWebsiteContent($pdo, $key, $value)
+{
+    try {
+        $stmt = $pdo->prepare("INSERT INTO website_content (content_key, content_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE content_value = ?");
+        return $stmt->execute([$key, $value, $value]);
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
 function getGameResults($pdo, $game_name)
 {
     $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = ?");
@@ -81,8 +103,13 @@ function updateGame($pdo, $data)
 
 function deleteGame($pdo, $game_name)
 {
-    $stmt = $pdo->prepare("DELETE FROM game_results WHERE game_name = ?");
-    return $stmt->execute([$game_name]);
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_results WHERE game_name = ?");
+        return $stmt->execute([$game_name]);
+    } catch (PDOException $e) {
+        error_log("Delete game error: " . $e->getMessage());
+        return false;
+    }
 }
 
 function updateDisawer($pdo, $today_result, $yesterday_result)

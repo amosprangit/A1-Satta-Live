@@ -5,52 +5,12 @@ ini_set('display_errors', 1);
 
 $page_title = 'SATTA RECORD CHART 2026 - A1 satta live';
 
-// Try to include config, die with message if fails
-if (!file_exists('config.php')) {
-    die("Error: config.php file not found. Please check file path.");
-}
 require_once 'config.php';
-
-if (!file_exists('header.php')) {
-    die("Error: header.php file not found. Please check file path.");
-}
 require_once 'header.php';
-
-// Check database connection
-if (!isset($pdo) || !($pdo instanceof PDO)) {
-    die("Error: Database connection failed. Please check config.php settings.");
-}
 
 // Get current month/year from URL or default to current
 $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
 $month_name = date('F Y', strtotime($month . '-01'));
-
-// Define the games in order
-$table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali', 'disawer'];
-$table2_games = ['hr satta', 'ujjala super', 'kkr city', 'madhupuri', 'karol bagh', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'dehradun city', 'daman'];
-
-// Get all dates in this month that have data
-try {
-    $stmt = $pdo->prepare("SELECT DISTINCT result_number FROM chart_data WHERE DATE_FORMAT(result_number, '%Y-%m') = ? ORDER BY result_number");
-    $stmt->execute([$month]);
-    $date_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // If table doesn't exist or query fails
-    $date_list = [];
-    $db_error = $e->getMessage();
-}
-
-// Get disawer result for display
-try {
-    $disawer_result_data = $pdo->query("SELECT today_result, yesterday_result FROM game_results WHERE game_name = 'disawer'")->fetch(PDO::FETCH_ASSOC);
-    $disawer_today = $disawer_result_data ? $disawer_result_data['today_result'] : '71';
-    $disawer_yesterday = $disawer_result_data ? $disawer_result_data['yesterday_result'] : '52';
-} catch (PDOException $e) {
-    $disawer_today = '71';
-    $disawer_yesterday = '52';
-}
-
-// Generate dates for current month
 $year = date('Y', strtotime($month . '-01'));
 $month_num = date('m', strtotime($month . '-01'));
 $days_in_month = date('t', strtotime($month . '-01'));
@@ -59,28 +19,163 @@ $days_in_month = date('t', strtotime($month . '-01'));
 $prev_month = date('Y-m', strtotime($month . '-01 -1 month'));
 $next_month = date('Y-m', strtotime($month . '-01 +1 month'));
 
-// Function to get result for a specific game and date
-function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
-{
-    try {
-        if ($chart_type) {
-            $stmt = $pdo->prepare("SELECT result_number FROM chart_data WHERE game_name = ? AND result_number = ? AND chart_type = ?");
-            $stmt->execute([$game_name, $result_number, $chart_type]);
+// Fetch all games dynamically from database
+try {
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 'active' ORDER BY table_type, id");
+    $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $table1_games = [];
+    $table2_games = [];
+
+    foreach ($all_games_data as $game) {
+        if ($game['table_type'] == 'table2') {
+            $table2_games[] = $game;
         } else {
-            $stmt = $pdo->prepare("SELECT result_number FROM chart_data WHERE game_name = ? AND result_number = ? AND (chart_type IS NULL OR chart_type = '')");
-            $stmt->execute([$game_name, $result_number]);
+            $table1_games[] = $game;
         }
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ? $result['result_number'] : '--';
-    } catch (PDOException $e) {
-        return '--';
     }
+
+    // Fallback if empty
+    if (empty($table1_games)) {
+        $table1_games = [
+            ['game_name' => 'disawer', 'display_name' => 'DISAWER'],
+            ['game_name' => 'sadar bazar', 'display_name' => 'SADAR BAZAR'],
+            ['game_name' => 'gwalior', 'display_name' => 'GWALIOR'],
+            ['game_name' => 'delhi bazar', 'display_name' => 'DELHI BAZAR'],
+            ['game_name' => 'delhi matka', 'display_name' => 'DELHI MATKA'],
+            ['game_name' => 'shri ganesh', 'display_name' => 'SHRI GANESH'],
+            ['game_name' => 'agra', 'display_name' => 'AGRA'],
+            ['game_name' => 'faridabad', 'display_name' => 'FARIDABAD'],
+            ['game_name' => 'alwar', 'display_name' => 'ALWAR'],
+            ['game_name' => 'gaziabad', 'display_name' => 'GAZIABAD'],
+            ['game_name' => 'dwarka', 'display_name' => 'DWARKA'],
+            ['game_name' => 'gali', 'display_name' => 'GALI']
+        ];
+    }
+
+    if (empty($table2_games)) {
+        $table2_games = [
+            ['game_name' => 'hr satta', 'display_name' => 'HR SATTA'],
+            ['game_name' => 'kkr city', 'display_name' => 'KKR CITY'],
+            ['game_name' => 'madhupuri', 'display_name' => 'MADHUPURI'],
+            ['game_name' => 'ujjala super', 'display_name' => 'UJJALA SUPER'],
+            ['game_name' => 'karol bagh', 'display_name' => 'KAROL BAGH'],
+            ['game_name' => 'anmol bazar', 'display_name' => 'ANMOL BAZAR'],
+            ['game_name' => 'sky king', 'display_name' => 'SKY KING'],
+            ['game_name' => 'delhi darbar', 'display_name' => 'DELHI DARBAR'],
+            ['game_name' => 'new ganga', 'display_name' => 'NEW GANGA'],
+            ['game_name' => 'fatehabad', 'display_name' => 'FATEHABAD'],
+            ['game_name' => 'raj shree', 'display_name' => 'RAJ SHREE'],
+            ['game_name' => 'mandi bazar', 'display_name' => 'MANDI BAZAR'],
+            ['game_name' => 'bhadra bazar', 'display_name' => 'BHADRA BAZAR'],
+            ['game_name' => 'sialkot', 'display_name' => 'SIALKOT'],
+            ['game_name' => 'lion bazar', 'display_name' => 'LION BAZAR'],
+            ['game_name' => 'gaziabad king', 'display_name' => 'GAZIABAD KING'],
+            ['game_name' => 'dehradun city', 'display_name' => 'DEHRADUN CITY'],
+            ['game_name' => 'daman', 'display_name' => 'DAMAN']
+        ];
+    }
+} catch (PDOException $e) {
+    $table1_games = [
+        ['game_name' => 'disawer', 'display_name' => 'DISAWER'],
+        ['game_name' => 'sadar bazar', 'display_name' => 'SADAR BAZAR'],
+        ['game_name' => 'gwalior', 'display_name' => 'GWALIOR'],
+        ['game_name' => 'delhi bazar', 'display_name' => 'DELHI BAZAR'],
+        ['game_name' => 'delhi matka', 'display_name' => 'DELHI MATKA'],
+        ['game_name' => 'shri ganesh', 'display_name' => 'SHRI GANESH'],
+        ['game_name' => 'agra', 'display_name' => 'AGRA'],
+        ['game_name' => 'faridabad', 'display_name' => 'FARIDABAD'],
+        ['game_name' => 'alwar', 'display_name' => 'ALWAR'],
+        ['game_name' => 'gaziabad', 'display_name' => 'GAZIABAD'],
+        ['game_name' => 'dwarka', 'display_name' => 'DWARKA'],
+        ['game_name' => 'gali', 'display_name' => 'GALI']
+    ];
+    $table2_games = [
+        ['game_name' => 'hr satta', 'display_name' => 'HR SATTA'],
+        ['game_name' => 'kkr city', 'display_name' => 'KKR CITY'],
+        ['game_name' => 'madhupuri', 'display_name' => 'MADHUPURI'],
+        ['game_name' => 'ujjala super', 'display_name' => 'UJJALA SUPER'],
+        ['game_name' => 'karol bagh', 'display_name' => 'KAROL BAGH'],
+        ['game_name' => 'anmol bazar', 'display_name' => 'ANMOL BAZAR'],
+        ['game_name' => 'sky king', 'display_name' => 'SKY KING'],
+        ['game_name' => 'delhi darbar', 'display_name' => 'DELHI DARBAR'],
+        ['game_name' => 'new ganga', 'display_name' => 'NEW GANGA'],
+        ['game_name' => 'fatehabad', 'display_name' => 'FATEHABAD'],
+        ['game_name' => 'raj shree', 'display_name' => 'RAJ SHREE'],
+        ['game_name' => 'mandi bazar', 'display_name' => 'MANDI BAZAR'],
+        ['game_name' => 'bhadra bazar', 'display_name' => 'BHADRA BAZAR'],
+        ['game_name' => 'sialkot', 'display_name' => 'SIALKOT'],
+        ['game_name' => 'lion bazar', 'display_name' => 'LION BAZAR'],
+        ['game_name' => 'gaziabad king', 'display_name' => 'GAZIABAD KING'],
+        ['game_name' => 'dehradun city', 'display_name' => 'DEHRADUN CITY'],
+        ['game_name' => 'daman', 'display_name' => 'DAMAN']
+    ];
+}
+
+// Generate all dates for the month
+$all_dates = [];
+for ($day = 1; $day <= $days_in_month; $day++) {
+    $date_str = str_pad($day, 2, '0', STR_PAD_LEFT) . '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT);
+    $all_dates[] = $date_str;
+}
+
+// Fetch all chart data for this month
+try {
+    $stmt = $pdo->prepare("SELECT * FROM chart_data WHERE date LIKE ? ORDER BY date ASC");
+    $stmt->execute([$day_prefix = substr($month, 5, 2) . '-' !== false ? '%-' . substr($month, 5, 2) : '%']);
+
+    // Better approach - get all data and filter by month
+    $stmt = $pdo->query("SELECT * FROM chart_data ORDER BY date ASC");
+    $all_chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Filter for current month
+    $chart_data = [];
+    $month_pattern = '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT);
+    foreach ($all_chart_data as $row) {
+        if (strpos($row['date'], $month_pattern) !== false) {
+            $chart_data[] = $row;
+        }
+    }
+
+    // Get unique dates that have data
+    $dates_with_data = [];
+    foreach ($chart_data as $row) {
+        $dates_with_data[$row['date']] = true;
+    }
+    $dates_with_data = array_keys($dates_with_data);
+    sort($dates_with_data);
+
+} catch (PDOException $e) {
+    $chart_data = [];
+    $dates_with_data = [];
+    $db_error = $e->getMessage();
+}
+
+// Build lookup array: [date][game_name] = result_number
+$data_lookup = [];
+foreach ($chart_data as $row) {
+    $data_lookup[$row['date']][$row['game_name']] = $row['result_number'];
+}
+
+// Get disawer display info
+try {
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = 'disawer'");
+    $stmt->execute();
+    $disawer_info = $stmt->fetch(PDO::FETCH_ASSOC);
+    $disawer_display = $disawer_info['display_name'] ?? 'DISAWER';
+    $disawer_today = $disawer_info['today_result'] ?? '--';
+    $disawer_yesterday = $disawer_info['yesterday_result'] ?? '--';
+    $disawer_time = $disawer_info['result_time'] ?? '5:15 AM';
+} catch (PDOException $e) {
+    $disawer_display = 'DISAWER';
+    $disawer_today = '--';
+    $disawer_yesterday = '--';
+    $disawer_time = '5:15 AM';
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -102,46 +197,47 @@ function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
         .chart-main-container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
             background: #fef9e6;
         }
 
         .chart-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
         .chart-header h1 {
             color: #c49a00;
-            font-size: 32px;
-            margin-bottom: 10px;
+            font-size: clamp(22px, 4vw, 32px);
+            margin-bottom: 5px;
         }
 
         .chart-header h5 {
-            font-size: 20px;
+            font-size: clamp(16px, 3vw, 20px);
             color: #333;
-            margin: 10px 0;
+            margin: 8px 0;
         }
 
         .month-nav {
             text-align: center;
-            margin: 25px 0;
+            margin: 20px 0;
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 10px;
             flex-wrap: wrap;
         }
 
         .month-nav a {
             background: #ffd700;
-            padding: 10px 25px;
+            padding: 8px 20px;
             text-decoration: none;
             color: #000;
-            border-radius: 40px;
+            border-radius: 30px;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
             transition: 0.3s;
             border: 1px solid #333;
+            white-space: nowrap;
         }
 
         .month-nav a:hover {
@@ -151,10 +247,11 @@ function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
 
         .chart-table-wrapper {
             overflow-x: auto;
-            margin: 20px 0;
+            -webkit-overflow-scrolling: touch;
+            margin: 15px 0;
             background: #fff;
-            border-radius: 16px;
-            padding: 10px;
+            border-radius: 12px;
+            padding: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
@@ -162,27 +259,37 @@ function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
             width: 100%;
             border-collapse: collapse;
             background: #fff;
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
-            min-width: 800px;
+            min-width: 700px;
         }
 
         .chart-table th {
             background: #1e1e2a;
             color: #ffd700;
-            padding: 12px 8px;
-            font-size: 13px;
+            padding: 10px 6px;
+            font-size: 11px;
             font-weight: bold;
             text-align: center;
             border: 1px solid #333;
             white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .chart-table th:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #1e1e2a;
         }
 
         .chart-table td {
             border: 1px solid #ddd;
-            padding: 10px 6px;
+            padding: 8px 5px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
             color: #333;
         }
 
@@ -190,61 +297,87 @@ function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
             background: #fff8e0;
         }
 
+        .chart-table tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+        .chart-table tbody tr:nth-child(even):hover {
+            background: #fff8e0;
+        }
+
         .date-col {
             background: #fff8e7;
             font-weight: bold;
             color: #c49a00;
+            white-space: nowrap;
+            position: sticky;
+            left: 0;
+            z-index: 1;
         }
 
         .chart-number-box {
             background: #1e1e2a;
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
+            padding: 3px 10px;
+            border-radius: 15px;
             color: #ffd966;
             font-weight: bold;
-            font-size: 13px;
-            min-width: 50px;
+            font-size: 12px;
+            min-width: 40px;
+        }
+
+        .chart-number-box.empty {
+            background: #f0f0f0;
+            color: #ccc;
         }
 
         .chart-disawer-section {
             background: linear-gradient(135deg, #ffd700, #ffcc00);
             text-align: center;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 16px;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 12px;
         }
 
         .chart-disawer-section .disawer-title {
-            font-size: 36px;
+            font-size: clamp(24px, 5vw, 36px);
             font-weight: bold;
             color: #000;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
         }
 
         .chart-disawer-section .disawer-time {
-            font-size: 16px;
+            font-size: 14px;
             color: #333;
-            margin: 5px 0;
+            margin: 3px 0;
         }
 
         .chart-disawer-section .disawer-arrow {
-            font-size: 24px;
+            font-size: clamp(18px, 3vw, 24px);
             font-weight: bold;
-            letter-spacing: 8px;
+            letter-spacing: 6px;
             color: #000;
+        }
+
+        .section-title {
+            color: #333;
+            margin: 15px 0 10px;
+            text-align: center;
+            font-size: clamp(16px, 3vw, 20px);
+            font-weight: bold;
         }
 
         .back-home-btn {
             display: inline-block;
-            margin-top: 20px;
+            margin-top: 15px;
             background: #6c757d;
             color: white;
-            padding: 12px 30px;
+            padding: 10px 25px;
             text-decoration: none;
-            border-radius: 40px;
+            border-radius: 30px;
             font-weight: bold;
             transition: 0.3s;
+            font-size: 14px;
         }
 
         .back-home-btn:hover {
@@ -254,85 +387,117 @@ function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
 
         .no-data {
             text-align: center;
-            padding: 40px;
-            color: #666;
-            font-size: 16px;
+            padding: 30px;
+            color: #999;
+            font-size: 14px;
         }
 
         .db-error {
             background: #fff3cd;
             color: #856404;
-            padding: 15px;
-            margin: 20px;
+            padding: 12px;
+            margin: 15px;
             border-radius: 8px;
             border: 1px solid #ffeeba;
             text-align: center;
+            font-size: 13px;
         }
 
         .footer {
             background: #000;
             text-align: center;
-            padding: 30px;
+            padding: 20px;
             border-top: 1px solid #333;
-            margin-top: 40px;
+            margin-top: 30px;
         }
 
         .footer a {
             color: #ffd700;
             text-decoration: none;
-            margin: 0 20px;
-            font-size: 16px;
+            margin: 0 15px;
+            font-size: 14px;
         }
 
         .footer p {
             color: #666;
-            margin-top: 20px;
-            font-size: 14px;
+            margin-top: 15px;
+            font-size: 12px;
         }
 
         .disclaimer {
             background: #111;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             color: #888;
         }
 
         @media (max-width: 768px) {
+            .chart-main-container {
+                padding: 10px;
+            }
+
+            .chart-table-wrapper {
+                padding: 4px;
+                border-radius: 8px;
+            }
+
+            .chart-table {
+                min-width: 500px;
+            }
 
             .chart-table th,
             .chart-table td {
-                font-size: 11px;
-                padding: 6px 3px;
+                font-size: 10px;
+                padding: 5px 3px;
             }
 
             .chart-number-box {
-                padding: 2px 8px;
-                font-size: 11px;
-                min-width: 35px;
+                padding: 2px 6px;
+                font-size: 10px;
+                min-width: 30px;
+                border-radius: 10px;
             }
 
             .month-nav a {
-                padding: 6px 15px;
-                font-size: 12px;
-            }
-
-            .chart-header h1 {
-                font-size: 24px;
-            }
-
-            .chart-disawer-section .disawer-title {
-                font-size: 28px;
+                padding: 6px 12px;
+                font-size: 11px;
             }
 
             .footer a {
-                margin: 0 10px;
-                font-size: 12px;
+                margin: 0 8px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .chart-table {
+                min-width: 400px;
+            }
+
+            .chart-table th,
+            .chart-table td {
+                font-size: 9px;
+                padding: 4px 2px;
+            }
+
+            .chart-number-box {
+                padding: 1px 5px;
+                font-size: 9px;
+                min-width: 25px;
+            }
+
+            .month-nav {
+                gap: 5px;
+            }
+
+            .month-nav a {
+                padding: 5px 10px;
+                font-size: 10px;
             }
         }
     </style>
 </head>
-
 <body>
 
     <div class="chart-main-container">
@@ -348,120 +513,112 @@ function getGameResult($pdo, $game_name, $result_number, $chart_type = null)
         </div>
 
         <?php if (isset($db_error)): ?>
-            <div class="db-error">
-                ⚠️ Database Notice: <?php echo htmlspecialchars($db_error); ?><br>
-                <small>Check if the 'chart_data' table exists in your database.</small>
-            </div>
+                <div class="db-error">
+                    ⚠️ Database Notice: <?php echo htmlspecialchars($db_error); ?>
+                </div>
         <?php endif; ?>
 
+        <!-- Disawer Section -->
+        <div class="chart-disawer-section">
+            <div class="disawer-title"><?php echo htmlspecialchars(strtoupper($disawer_display)); ?></div>
+            <div class="disawer-time"><?php echo htmlspecialchars($disawer_time); ?></div>
+            <div class="disawer-arrow"><?php echo htmlspecialchars($disawer_yesterday); ?> ➡️ <?php echo htmlspecialchars($disawer_today); ?></div>
+        </div>
+
         <!-- TABLE 1 - Main Games Chart -->
-        <h3 style="color: #333; margin: 20px 0; text-align: center;">📋 MAIN GAMES CHART</h3>
+        <div class="section-title">📋 MAIN GAMES CHART</div>
         <div class="chart-table-wrapper">
             <table class="chart-table">
                 <thead>
                     <tr>
                         <th>DATE</th>
                         <?php foreach ($table1_games as $game): ?>
-                            <th><?php echo strtoupper($game); ?></th>
+                                <th><?php echo htmlspecialchars(strtoupper($game['display_name'] ?? $game['game_name'])); ?></th>
                         <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($date_list)): ?>
-                        <?php foreach ($date_list as $date_row):
-                            $date_formatted = date('d-m', strtotime($date_row['result_number']));
-                            ?>
-                            <tr>
-                                <td class="date-col"><strong><?php echo $date_formatted; ?></strong></td>
-                                <?php foreach ($table1_games as $game): ?>
-                                    <td>
-                                        <span class="chart-number-box">
-                                            <?php echo htmlspecialchars(getGameResult($pdo, $game, $date_row['result_number'], 'table1')); ?>
-                                        </span>
-                                    </td>
-                                <?php endforeach; ?>
-                            </tr>
-                        <?php endforeach; ?>
+                    <?php if (!empty($all_dates)): ?>
+                            <?php foreach ($all_dates as $date_str): ?>
+                                    <tr>
+                                        <td class="date-col"><strong><?php echo $date_str; ?></strong></td>
+                                        <?php foreach ($table1_games as $game):
+                                            $result = $data_lookup[$date_str][$game['game_name']] ?? null;
+                                            ?>
+                                                <td>
+                                                    <span class="chart-number-box <?php echo !$result ? 'empty' : ''; ?>">
+                                                        <?php echo $result ? htmlspecialchars($result) : '--'; ?>
+                                                    </span>
+                                                </td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                            <?php endforeach; ?>
                     <?php else: ?>
-                        <tr>
-                            <td colspan="<?php echo count($table1_games) + 1; ?>" class="no-data">
-                                📭 No chart data available for <?php echo $month_name; ?>.
-                                <?php if (isset($db_error)): ?>
-                                    <br>Please add data through the admin panel.
-                                <?php endif; ?>
-                            </td>
-                        </tr>
+                            <tr>
+                                <td colspan="<?php echo count($table1_games) + 1; ?>" class="no-data">
+                                    📭 No chart data available for <?php echo $month_name; ?>.
+                                </td>
+                            </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
 
         <!-- TABLE 2 - Extra Games Chart -->
-        <h3 style="color: #333; margin: 20px 0; text-align: center;">📋 EXTRA GAMES CHART</h3>
+        <div class="section-title">📋 EXTRA GAMES CHART</div>
         <div class="chart-table-wrapper">
             <table class="chart-table">
                 <thead>
                     <tr>
                         <th>DATE</th>
                         <?php foreach ($table2_games as $game): ?>
-                            <th><?php echo strtoupper($game); ?></th>
+                                <th><?php echo htmlspecialchars(strtoupper($game['display_name'] ?? $game['game_name'])); ?></th>
                         <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($date_list)): ?>
-                        <?php foreach ($date_list as $date_row):
-                            $date_formatted = date('d-m', strtotime($date_row['result_number']));
-                            ?>
-                            <tr>
-                                <td class="date-col"><strong><?php echo $date_formatted; ?></strong></td>
-                                <?php foreach ($table2_games as $game): ?>
-                                    <td>
-                                        <span class="chart-number-box">
-                                            <?php echo htmlspecialchars(getGameResult($pdo, $game, $date_row['result_number'], 'table2')); ?>
-                                        </span>
-                                    </td>
-                                <?php endforeach; ?>
-                            </tr>
-                        <?php endforeach; ?>
+                    <?php if (!empty($all_dates)): ?>
+                            <?php foreach ($all_dates as $date_str): ?>
+                                    <tr>
+                                        <td class="date-col"><strong><?php echo $date_str; ?></strong></td>
+                                        <?php foreach ($table2_games as $game):
+                                            $result = $data_lookup[$date_str][$game['game_name']] ?? null;
+                                            ?>
+                                                <td>
+                                                    <span class="chart-number-box <?php echo !$result ? 'empty' : ''; ?>">
+                                                        <?php echo $result ? htmlspecialchars($result) : '--'; ?>
+                                                    </span>
+                                                </td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                            <?php endforeach; ?>
                     <?php else: ?>
-                        <tr>
-                            <td colspan="<?php echo count($table2_games) + 1; ?>" class="no-data">
-                                📭 No chart data available for <?php echo $month_name; ?>.
-                                <?php if (isset($db_error)): ?>
-                                    <br>Please add data through the admin panel.
-                                <?php endif; ?>
-                            </td>
-                        </tr>
+                            <tr>
+                                <td colspan="<?php echo count($table2_games) + 1; ?>" class="no-data">
+                                    📭 No chart data available for <?php echo $month_name; ?>.
+                                </td>
+                            </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
 
-        <div style="text-align: center; margin: 30px 0 20px;">
+        <div style="text-align: center; margin: 25px 0 15px;">
             <a href="index.php" class="back-home-btn">🏠 BACK TO HOME</a>
         </div>
     </div>
 
     <!-- Footer -->
-    <?php if (file_exists('footer.php')): ?>
-        <?php require_once 'footer.php'; ?>
-    <?php else: ?>
-        <div class="footer">
-            <a href="/privacy-policy">Privacy Policy</a>
-            <a href="/terms-and-conditions">Terms & Conditions</a>
-            <a href="/disclaimer">Disclaimer</a>
-            <p>© 2026 A1 satta live | All Rights Reserved</p>
-        </div>
+    <div class="footer">
+        <a href="/privacy-policy">Privacy Policy</a>
+        <a href="/terms-and-conditions">Terms & Conditions</a>
+        <a href="/disclaimer">Disclaimer</a>
+        <p>© 2026 A1 satta live | All Rights Reserved</p>
+    </div>
 
-        <div class="disclaimer">
-            !! DISCLAIMER - A1 satta live is a non-commercial informational website. Please view this site at your own risk,
-            All The Information Shown On Website Is Sponsored And We Warn You That satta matka Gambling/Satta May Be Banned
-            Or Illegal In Your Country. We Are Not Responsible For Any Issues Or Scam..., We Respect All Country
-            Rules/Laws... If You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
-        </div>
-    <?php endif; ?>
+    <div class="disclaimer">
+        !! DISCLAIMER - A1 satta live is a non-commercial informational website. Please view this site at your own risk, All The Information Shown On Website Is Sponsored And We Warn You That satta matka Gambling/Satta May Be Banned Or Illegal In Your Country. We Are Not Responsible For Any Issues Or Scam..., We Respect All Country Rules/Laws... If You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
+    </div>
 
 </body>
-
 </html>

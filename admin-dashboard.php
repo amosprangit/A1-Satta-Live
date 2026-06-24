@@ -11,18 +11,20 @@ $page_title = 'Admin Dashboard - A1 Satta Live';
 
 // Handle all POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     // Update Game Result
     if (isset($_POST['update_result'])) {
-        $data = [
-            'game_name' => $_POST['game_name'],
-            'today_result' => $_POST['today_result'],
-            'yesterday_result' => $_POST['yesterday_result'],
-            'result_time' => $_POST['result_time'],
-            'display_name' => $_POST['display_name']
-        ];
-        if (updateGame($pdo, $data)) {
-            $_SESSION['success'] = "✅ Result updated for " . ucfirst($data['game_name']);
-        } else {
+        try {
+            $stmt = $pdo->prepare("UPDATE game_results SET today_result = ?, yesterday_result = ?, result_time = ?, display_name = ? WHERE game_name = ?");
+            $stmt->execute([
+                $_POST['today_result'],
+                $_POST['yesterday_result'],
+                $_POST['result_time'],
+                $_POST['display_name'],
+                $_POST['game_name']
+            ]);
+            $_SESSION['success'] = "✅ Result updated for " . htmlspecialchars(ucfirst($_POST['game_name']));
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to update result!";
         }
         header('Location: admin-dashboard.php');
@@ -31,24 +33,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Add New Game
     if (isset($_POST['add_game'])) {
-        $data = [
-            'game_name' => strtolower(trim($_POST['new_game_name'])),
-            'display_name' => $_POST['new_display_name'] ?: ucfirst($_POST['new_game_name']),
-            'today_result' => $_POST['new_today_result'] ?: 'WAIT',
-            'yesterday_result' => $_POST['new_yesterday_result'] ?: '--',
-            'result_time' => $_POST['new_result_time'] ?: '--',
-            'table_type' => $_POST['new_table_type']
-        ];
+        $game_name = strtolower(trim($_POST['new_game_name']));
+        $display_name = $_POST['new_display_name'] ?: ucfirst($_POST['new_game_name']);
+        $today_result = $_POST['new_today_result'] ?: 'WAIT';
+        $yesterday_result = $_POST['new_yesterday_result'] ?: '--';
+        $result_time = $_POST['new_result_time'] ?: '--';
+        $table_type = $_POST['new_table_type'];
 
-        $existing = getGameResults($pdo, $data['game_name']);
-        if ($existing) {
-            $_SESSION['error'] = "❌ Game '" . ucfirst($data['game_name']) . "' already exists!";
-        } else {
-            if (addGame($pdo, $data)) {
-                $_SESSION['success'] = "✅ Game '" . ucfirst($data['game_name']) . "' added successfully!";
+        try {
+            // Check if game already exists
+            $stmt = $pdo->prepare("SELECT id FROM game_results WHERE game_name = ?");
+            $stmt->execute([$game_name]);
+
+            if ($stmt->rowCount() > 0) {
+                $_SESSION['error'] = "❌ Game '" . htmlspecialchars(ucfirst($game_name)) . "' already exists!";
             } else {
-                $_SESSION['error'] = "❌ Failed to add game!";
+                $stmt = $pdo->prepare("INSERT INTO game_results (game_name, display_name, today_result, yesterday_result, result_time, table_type, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
+                $stmt->execute([$game_name, $display_name, $today_result, $yesterday_result, $result_time, $table_type]);
+                $_SESSION['success'] = "✅ Game '" . htmlspecialchars(ucfirst($game_name)) . "' added successfully!";
             }
+        } catch (PDOException $e) {
+            $_SESSION['error'] = "❌ Failed to add game!";
         }
         header('Location: admin-dashboard.php');
         exit();
@@ -56,9 +61,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Update Disawer
     if (isset($_POST['update_disawer'])) {
-        if (updateDisawer($pdo, $_POST['disawer_today'], $_POST['disawer_yesterday'])) {
-            $_SESSION['success'] = "✅ Disawer result updated!";
-        } else {
+        try {
+            $display_name = $_POST['disawer_display_name'] ?? 'DISAWER';
+            $time = $_POST['disawer_time'] ?? '5:15 AM';
+            $today = $_POST['disawer_today'] ?? '86';
+            $yesterday = $_POST['disawer_yesterday'] ?? '05';
+
+            $stmt = $pdo->prepare("UPDATE game_results SET today_result = ?, yesterday_result = ?, result_time = ?, display_name = ? WHERE game_name = 'disawer'");
+            $stmt->execute([$today, $yesterday, $time, $display_name]);
+
+            if ($stmt->rowCount() > 0) {
+                $_SESSION['success'] = "✅ Disawer updated successfully!";
+            } else {
+                // If disawer doesn't exist, create it
+                $stmt = $pdo->prepare("INSERT INTO game_results (game_name, display_name, today_result, yesterday_result, result_time, status, table_type) VALUES ('disawer', ?, ?, ?, ?, 'active', 'table1')");
+                $stmt->execute([$display_name, $today, $yesterday, $time]);
+                $_SESSION['success'] = "✅ Disawer created successfully!";
+            }
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to update Disawer!";
         }
         header('Location: admin-dashboard.php');
@@ -67,9 +87,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Update Chart Data
     if (isset($_POST['update_chart'])) {
-        if (updateChartData($pdo, $_POST['chart_game'], $_POST['chart_date'], $_POST['chart_result'], $_POST['chart_table_type'])) {
-            $_SESSION['success'] = "✅ Chart updated for " . ucfirst($_POST['chart_game']) . " on " . $_POST['chart_date'];
-        } else {
+        try {
+            // Check if entry exists
+            $stmt = $pdo->prepare("SELECT id FROM chart_data WHERE game_name = ? AND date = ? AND table_type = ?");
+            $stmt->execute([$_POST['chart_game'], $_POST['chart_date'], $_POST['chart_table_type']]);
+
+            if ($stmt->rowCount() > 0) {
+                $stmt = $pdo->prepare("UPDATE chart_data SET result_number = ? WHERE game_name = ? AND date = ? AND table_type = ?");
+                $stmt->execute([$_POST['chart_result'], $_POST['chart_game'], $_POST['chart_date'], $_POST['chart_table_type']]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$_POST['chart_game'], $_POST['chart_date'], $_POST['chart_result'], $_POST['chart_table_type']]);
+            }
+            $_SESSION['success'] = "✅ Chart updated for " . htmlspecialchars(ucfirst($_POST['chart_game'])) . " on " . htmlspecialchars($_POST['chart_date']);
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to update chart!";
         }
         header('Location: admin-dashboard.php?tab=chart');
@@ -88,60 +119,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
 
-        // Generate data for the entire month
         $days_in_month = cal_days_in_month(CAL_GREGORIAN, (int) $month, (int) $year);
+        $sample_results = ['12', '45', '78', '23', '56', '89', '34', '67', '90', '15', '48', '71', '29', '53', '86', '41', '74', '18', '62', '95', '37', '50', '83', '26', '59', '92', '35', '68', '10', '43', '76'];
 
-        $sample_results = [
-            '12',
-            '45',
-            '78',
-            '23',
-            '56',
-            '89',
-            '34',
-            '67',
-            '90',
-            '15',
-            '48',
-            '71',
-            '29',
-            '53',
-            '86',
-            '41',
-            '74',
-            '18',
-            '62',
-            '95',
-            '37',
-            '50',
-            '83',
-            '26',
-            '59',
-            '92',
-            '35',
-            '68',
-            '10',
-            '43',
-            '76'
-        ];
-
-        // Get table type from database
-        $game_info = getGameResults($pdo, $game);
-        $table_type = $game_info ? $game_info['table_type'] : 'table1';
+        // Get table type for the game
+        try {
+            $stmt = $pdo->prepare("SELECT table_type FROM game_results WHERE game_name = ?");
+            $stmt->execute([$game]);
+            $game_info = $stmt->fetch(PDO::FETCH_ASSOC);
+            $table_type = $game_info ? $game_info['table_type'] : 'table1';
+        } catch (PDOException $e) {
+            $table_type = 'table1';
+        }
 
         $count = 0;
         for ($day = 1; $day <= $days_in_month; $day++) {
             $date_str = str_pad($day, 2, '0', STR_PAD_LEFT) . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
             $result = $sample_results[array_rand($sample_results)];
 
-            // Use updateChartData function
-            if (updateChartData($pdo, $game, $date_str, $result, $table_type)) {
-                $count++;
+            try {
+                $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE result_number = ?");
+                $stmt->execute([$game, $date_str, $result, $table_type, $result]);
+                if ($stmt->rowCount() > 0)
+                    $count++;
+            } catch (PDOException $e) {
+                continue;
             }
         }
 
         if ($count > 0) {
-            $_SESSION['success'] = "✅ Generated/Updated $count entries for " . ucfirst($game) . " - " . $month . '/' . $year . " (Table: " . $table_type . ")";
+            $_SESSION['success'] = "✅ Generated/Updated $count entries for " . htmlspecialchars(ucfirst($game));
         } else {
             $_SESSION['error'] = "❌ Failed to generate chart data!";
         }
@@ -151,9 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Add Game Timing
     if (isset($_POST['add_timing'])) {
-        if (addGameTiming($pdo, $_POST['timing_game_name'], $_POST['timing_time'], $_POST['timing_emoji'])) {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO game_timings (game_name, timing, emoji, is_active) VALUES (?, ?, ?, 1)");
+            $stmt->execute([$_POST['timing_game_name'], $_POST['timing_time'], $_POST['timing_emoji']]);
             $_SESSION['success'] = "✅ Game timing added successfully!";
-        } else {
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to add timing!";
         }
         header('Location: admin-dashboard.php?tab=timings');
@@ -162,9 +171,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Update Game Timing
     if (isset($_POST['update_timing'])) {
-        if (updateGameTiming($pdo, $_POST['timing_id'], $_POST['timing_game_name'], $_POST['timing_time'], $_POST['timing_emoji'], $_POST['timing_is_active'] ?? 1)) {
+        try {
+            $is_active = isset($_POST['timing_is_active']) ? $_POST['timing_is_active'] : 1;
+            $stmt = $pdo->prepare("UPDATE game_timings SET game_name = ?, timing = ?, emoji = ?, is_active = ? WHERE id = ?");
+            $stmt->execute([$_POST['timing_game_name'], $_POST['timing_time'], $_POST['timing_emoji'], $is_active, $_POST['timing_id']]);
             $_SESSION['success'] = "✅ Game timing updated!";
-        } else {
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to update timing!";
         }
         header('Location: admin-dashboard.php?tab=timings');
@@ -173,9 +185,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Add Game Rate
     if (isset($_POST['add_rate'])) {
-        if (addGameRate($pdo, $_POST['rate_type'], $_POST['rate_value'], $_POST['rate_display_order'] ?? 0)) {
+        try {
+            $display_order = isset($_POST['rate_display_order']) ? (int) $_POST['rate_display_order'] : 0;
+            $stmt = $pdo->prepare("INSERT INTO game_rates (rate_type, rate_value, display_order, is_active) VALUES (?, ?, ?, 1)");
+            $stmt->execute([$_POST['rate_type'], $_POST['rate_value'], $display_order]);
             $_SESSION['success'] = "✅ Game rate added successfully!";
-        } else {
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to add rate!";
         }
         header('Location: admin-dashboard.php?tab=rates');
@@ -184,9 +199,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Update Game Rate
     if (isset($_POST['update_rate'])) {
-        if (updateGameRate($pdo, $_POST['rate_id'], $_POST['rate_type'], $_POST['rate_value'], $_POST['rate_is_active'] ?? 1)) {
+        try {
+            $is_active = isset($_POST['rate_is_active']) ? $_POST['rate_is_active'] : 1;
+            $stmt = $pdo->prepare("UPDATE game_rates SET rate_type = ?, rate_value = ?, is_active = ? WHERE id = ?");
+            $stmt->execute([$_POST['rate_type'], $_POST['rate_value'], $is_active, $_POST['rate_id']]);
             $_SESSION['success'] = "✅ Game rate updated!";
-        } else {
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to update rate!";
         }
         header('Location: admin-dashboard.php?tab=rates');
@@ -195,9 +213,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Add Multiple Result
     if (isset($_POST['add_multiple_result'])) {
-        if (addGameResult($pdo, $_POST['mr_game_name'], $_POST['mr_result_date'], $_POST['mr_result_number'], $_POST['mr_result_time'])) {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO game_multiple_results (game_name, result_date, result_number, result_time) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$_POST['mr_game_name'], $_POST['mr_result_date'], $_POST['mr_result_number'], $_POST['mr_result_time']]);
             $_SESSION['success'] = "✅ Result added successfully!";
-        } else {
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to add result!";
         }
         header('Location: admin-dashboard.php?tab=multiple');
@@ -206,9 +226,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Update Multiple Result
     if (isset($_POST['update_multiple_result'])) {
-        if (updateGameResult($pdo, $_POST['mr_id'], $_POST['mr_game_name'], $_POST['mr_result_date'], $_POST['mr_result_number'], $_POST['mr_result_time'])) {
+        try {
+            $stmt = $pdo->prepare("UPDATE game_multiple_results SET game_name = ?, result_date = ?, result_number = ?, result_time = ? WHERE id = ?");
+            $stmt->execute([$_POST['mr_game_name'], $_POST['mr_result_date'], $_POST['mr_result_number'], $_POST['mr_result_time'], $_POST['mr_id']]);
             $_SESSION['success'] = "✅ Result updated!";
-        } else {
+        } catch (PDOException $e) {
             $_SESSION['error'] = "❌ Failed to update result!";
         }
         header('Location: admin-dashboard.php?tab=multiple');
@@ -218,19 +240,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Handle GET requests (Delete operations)
 if (isset($_GET['delete_game'])) {
-    if (deleteGame($pdo, $_GET['delete_game'])) {
-        $_SESSION['success'] = "🗑️ Game deleted successfully!";
-    } else {
-        $_SESSION['error'] = "❌ Failed to delete game!";
+    $game_to_delete = $_GET['delete_game'];
+
+    try {
+        // Delete related chart data first
+        $stmt = $pdo->prepare("DELETE FROM chart_data WHERE game_name = ?");
+        $stmt->execute([$game_to_delete]);
+
+        // Delete the game
+        $stmt = $pdo->prepare("DELETE FROM game_results WHERE game_name = ?");
+        $stmt->execute([$game_to_delete]);
+
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['success'] = "🗑️ Game deleted successfully!";
+        } else {
+            $_SESSION['error'] = "❌ Game not found!";
+        }
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Error deleting game!";
     }
+
     header('Location: admin-dashboard.php');
     exit();
 }
 
 if (isset($_GET['delete_chart'])) {
-    if (deleteChartData($pdo, $_GET['delete_chart'], $_GET['chart_date'], $_GET['chart_table_type'])) {
-        $_SESSION['success'] = "🗑️ Chart data deleted successfully!";
-    } else {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM chart_data WHERE game_name = ? AND date = ? AND table_type = ?");
+        $stmt->execute([$_GET['delete_chart'], $_GET['chart_date'], $_GET['chart_table_type']]);
+
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['success'] = "🗑️ Chart data deleted successfully!";
+        } else {
+            $_SESSION['error'] = "❌ Chart data not found!";
+        }
+    } catch (PDOException $e) {
         $_SESSION['error'] = "❌ Failed to delete chart data!";
     }
     header('Location: admin-dashboard.php?tab=chart');
@@ -238,9 +282,16 @@ if (isset($_GET['delete_chart'])) {
 }
 
 if (isset($_GET['delete_timing'])) {
-    if (deleteGameTiming($pdo, $_GET['delete_timing'])) {
-        $_SESSION['success'] = "🗑️ Game timing deleted!";
-    } else {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_timings WHERE id = ?");
+        $stmt->execute([$_GET['delete_timing']]);
+
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['success'] = "🗑️ Game timing deleted!";
+        } else {
+            $_SESSION['error'] = "❌ Timing not found!";
+        }
+    } catch (PDOException $e) {
         $_SESSION['error'] = "❌ Failed to delete timing!";
     }
     header('Location: admin-dashboard.php?tab=timings');
@@ -248,9 +299,16 @@ if (isset($_GET['delete_timing'])) {
 }
 
 if (isset($_GET['delete_rate'])) {
-    if (deleteGameRate($pdo, $_GET['delete_rate'])) {
-        $_SESSION['success'] = "🗑️ Game rate deleted!";
-    } else {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_rates WHERE id = ?");
+        $stmt->execute([$_GET['delete_rate']]);
+
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['success'] = "🗑️ Game rate deleted!";
+        } else {
+            $_SESSION['error'] = "❌ Rate not found!";
+        }
+    } catch (PDOException $e) {
         $_SESSION['error'] = "❌ Failed to delete rate!";
     }
     header('Location: admin-dashboard.php?tab=rates');
@@ -258,9 +316,16 @@ if (isset($_GET['delete_rate'])) {
 }
 
 if (isset($_GET['delete_multiple_result'])) {
-    if (deleteGameResult($pdo, $_GET['delete_multiple_result'])) {
-        $_SESSION['success'] = "🗑️ Result deleted!";
-    } else {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_multiple_results WHERE id = ?");
+        $stmt->execute([$_GET['delete_multiple_result']]);
+
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['success'] = "🗑️ Result deleted!";
+        } else {
+            $_SESSION['error'] = "❌ Result not found!";
+        }
+    } catch (PDOException $e) {
         $_SESSION['error'] = "❌ Failed to delete result!";
     }
     header('Location: admin-dashboard.php?tab=multiple');
@@ -268,24 +333,24 @@ if (isset($_GET['delete_multiple_result'])) {
 }
 
 if (isset($_GET['toggle_timing'])) {
-    $stmt = $pdo->prepare("SELECT is_active FROM game_timings WHERE id = ?");
-    $stmt->execute([$_GET['toggle_timing']]);
-    $current = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($current) {
-        toggleGameTiming($pdo, $_GET['toggle_timing'], $current['is_active'] ? 0 : 1);
+    try {
+        $stmt = $pdo->prepare("UPDATE game_timings SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
+        $stmt->execute([$_GET['toggle_timing']]);
         $_SESSION['success'] = "✅ Timing status toggled!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to toggle timing!";
     }
     header('Location: admin-dashboard.php?tab=timings');
     exit();
 }
 
 if (isset($_GET['toggle_rate'])) {
-    $stmt = $pdo->prepare("SELECT is_active FROM game_rates WHERE id = ?");
-    $stmt->execute([$_GET['toggle_rate']]);
-    $current = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($current) {
-        toggleGameRate($pdo, $_GET['toggle_rate'], $current['is_active'] ? 0 : 1);
+    try {
+        $stmt = $pdo->prepare("UPDATE game_rates SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
+        $stmt->execute([$_GET['toggle_rate']]);
         $_SESSION['success'] = "✅ Rate status toggled!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to toggle rate!";
     }
     header('Location: admin-dashboard.php?tab=rates');
     exit();
@@ -299,7 +364,7 @@ if (isset($_GET['logout'])) {
 // Get current tab
 $current_tab = $_GET['tab'] ?? 'games';
 
-// Check if we're editing from URL parameters
+// URL parameters for editing
 $edit_game = $_GET['edit_game'] ?? '';
 $edit_date = $_GET['edit_date'] ?? '';
 $edit_result = $_GET['edit_result'] ?? '';
@@ -308,58 +373,177 @@ $selected_game = $_GET['game'] ?? '';
 $selected_month = $_GET['month'] ?? date('m');
 $selected_year = $_GET['year'] ?? date('Y');
 
-// Fetch all data
-$disawer = getGameResults($pdo, 'disawer');
-$disawer_result = $disawer ? $disawer['today_result'] : '86';
-$disawer_yesterday = $disawer ? $disawer['yesterday_result'] : '05';
+// ============= FETCH ALL DATA DYNAMICALLY =============
 
-$all_games = getAllGames($pdo);
-$all_chart_data = getAllChartData($pdo);
-$chart_dates = getChartDates($pdo);
-$game_timings = getAllGameTimings($pdo);
-$game_rates = getAllGameRates($pdo);
-$multiple_results = getGameMultipleResults($pdo);
+// Fetch Disawer data
+try {
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = 'disawer'");
+    $stmt->execute();
+    $disawer = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $disawer = false;
+}
+$disawer_result = $disawer['today_result'] ?? '86';
+$disawer_yesterday = $disawer['yesterday_result'] ?? '05';
 
-// Define game lists
-$table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
-$table2_games = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+// Fetch all games from game_results table
+try {
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE game_name != 'disawer' ORDER BY table_type, id");
+    $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Organize games by table type
+    $table1_games = [];
+    $table2_games = [];
+
+    foreach ($all_games_data as $game) {
+        if ($game['table_type'] == 'table2') {
+            $table2_games[] = $game['game_name'];
+        } else {
+            $table1_games[] = $game['game_name'];
+        }
+    }
+
+    // If tables are empty, use defaults
+    if (empty($table1_games)) {
+        $table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
+    }
+
+    if (empty($table2_games)) {
+        $table2_games = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+    }
+
+    // Create associative array for easy lookup
+    $all_games = [];
+    foreach ($all_games_data as $game) {
+        $all_games[$game['game_name']] = $game;
+    }
+
+} catch (PDOException $e) {
+    // Fallback to default lists
+    $table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
+    $table2_games = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+    $all_games = [];
+}
+
+// Fetch chart data
+try {
+    $stmt = $pdo->query("SELECT * FROM chart_data ORDER BY id DESC");
+    $all_chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $all_chart_data = [];
+}
+
+// Fetch game timings
+try {
+    $stmt = $pdo->query("SELECT * FROM game_timings ORDER BY display_order, id");
+    $game_timings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $game_timings = [];
+}
+
+// Fetch game rates
+try {
+    $stmt = $pdo->query("SELECT * FROM game_rates ORDER BY display_order, id");
+    $game_rates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $game_rates = [];
+}
+
+// Fetch multiple results
+try {
+    $stmt = $pdo->query("SELECT * FROM game_multiple_results ORDER BY result_date DESC, id DESC");
+    $multiple_results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $multiple_results = [];
+}
+
+// Get unique game names for dropdowns
+try {
+    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 'active' ORDER BY game_name");
+    $game_names_list = $stmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {
+    $game_names_list = array_merge($table1_games, $table2_games);
+}
+
+// Chart games lists
 $chart1_games = array_merge($table1_games, ['disawer']);
 $chart2_games = $table2_games;
-
-// For chart data display - use $all_chart_data directly
 $chart_data_display = $all_chart_data;
+
+// Update Khaiwal Info
+if (isset($_POST['update_khaiwal'])) {
+    updateWebsiteContent($pdo, 'khaiwal_line1', $_POST['khaiwal_line1']);
+    updateWebsiteContent($pdo, 'khaiwal_line2', $_POST['khaiwal_line2']);
+    $_SESSION['success'] = "✅ Khaiwal info updated!";
+    header('Location: admin-dashboard.php?tab=settings');
+    exit();
+}
+
+// Update WhatsApp Settings
+if (isset($_POST['update_whatsapp'])) {
+    updateWebsiteContent($pdo, 'whatsapp_number', $_POST['whatsapp_number']);
+    updateWebsiteContent($pdo, 'whatsapp_text', $_POST['whatsapp_text']);
+    updateWebsiteContent($pdo, 'whatsapp_subtext', $_POST['whatsapp_subtext']);
+    $_SESSION['success'] = "✅ WhatsApp settings updated!";
+    header('Location: admin-dashboard.php?tab=settings');
+    exit();
+}
+
+// Update Top WhatsApp Card
+if (isset($_POST['update_top_whatsapp'])) {
+    updateWebsiteContent($pdo, 'top_whatsapp_number', $_POST['top_whatsapp_number']);
+    updateWebsiteContent($pdo, 'top_whatsapp_text', $_POST['top_whatsapp_text']);
+    updateWebsiteContent($pdo, 'top_whatsapp_btn', $_POST['top_whatsapp_btn']);
+    $_SESSION['success'] = "✅ WhatsApp card updated!";
+    header('Location: admin-dashboard.php?tab=settings');
+    exit();
+}
+
+// Update Telegram Card
+if (isset($_POST['update_telegram'])) {
+    updateWebsiteContent($pdo, 'telegram_link', $_POST['telegram_link']);
+    updateWebsiteContent($pdo, 'telegram_text', $_POST['telegram_text']);
+    updateWebsiteContent($pdo, 'telegram_btn', $_POST['telegram_btn']);
+    $_SESSION['success'] = "✅ Telegram card updated!";
+    header('Location: admin-dashboard.php?tab=settings');
+    exit();
+}
 
 require_once 'header.php';
 ?>
 
 <style>
-    /* Dashboard Styles */
+    * {
+        box-sizing: border-box;
+    }
+
     .admin-container {
         max-width: 1400px;
         margin: 0 auto;
-        padding: 20px;
+        padding: 15px;
     }
 
     .admin-header {
         background: linear-gradient(135deg, #1a1a2e, #16213e);
         color: #ffd700;
-        padding: 30px;
-        border-radius: 20px;
-        margin-bottom: 30px;
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 20px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
+        gap: 15px;
     }
 
     .admin-header h1 {
-        font-size: 28px;
+        font-size: clamp(20px, 4vw, 28px);
         margin: 0;
     }
 
     .admin-header .header-actions {
         display: flex;
-        gap: 15px;
+        gap: 10px;
         align-items: center;
         flex-wrap: wrap;
     }
@@ -367,10 +551,12 @@ require_once 'header.php';
     .admin-header .header-actions a {
         color: #fff;
         text-decoration: none;
-        padding: 8px 20px;
-        border-radius: 40px;
+        padding: 8px 15px;
+        border-radius: 30px;
         background: rgba(255, 255, 255, 0.1);
         transition: background 0.3s;
+        font-size: 13px;
+        white-space: nowrap;
     }
 
     .admin-header .header-actions a:hover {
@@ -385,28 +571,38 @@ require_once 'header.php';
         background: #c82333;
     }
 
+    /* ===== SECTION STYLES ===== */
     .admin-section {
         background: #fff;
-        border-radius: 20px;
+        border-radius: 15px;
         padding: 25px;
-        margin-bottom: 30px;
-        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-        border-left: 5px solid #ffd700;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        border-left: 4px solid #ffd700;
     }
 
     .admin-section h2 {
         color: #1a1a2e;
         margin-top: 0;
         margin-bottom: 20px;
-        font-size: 22px;
+        font-size: clamp(16px, 3vw, 20px);
         border-bottom: 2px solid #ffd700;
         padding-bottom: 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
     }
 
+    /* ===== FORM STYLES - FIXED ===== */
     .admin-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .admin-form .form-row {
         display: flex;
         gap: 15px;
         flex-wrap: wrap;
@@ -415,49 +611,75 @@ require_once 'header.php';
 
     .admin-form .form-group {
         flex: 1;
-        min-width: 150px;
+        min-width: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .admin-form .form-group.full-width {
+        flex: 1 1 100%;
     }
 
     .admin-form label {
-        display: block;
-        font-weight: bold;
-        margin-bottom: 5px;
+        font-weight: 600;
         font-size: 13px;
         color: #333;
+        text-align: left;
+        margin-bottom: 0;
+        display: block;
     }
 
     .admin-form input,
     .admin-form select,
     .admin-form textarea {
-        width: 100%;
-        padding: 10px 15px;
-        border-radius: 10px;
+        padding: 10px 14px;
+        border-radius: 8px;
         border: 2px solid #e0e0e0;
         font-size: 14px;
         transition: border-color 0.3s;
         box-sizing: border-box;
+        width: 100%;
+        background: #fafafa;
     }
 
     .admin-form input:focus,
-    .admin-form select:focus {
+    .admin-form select:focus,
+    .admin-form textarea:focus {
         border-color: #ffd700;
         outline: none;
+        background: #fff;
+    }
+
+    .admin-form textarea {
+        resize: vertical;
+        min-height: 60px;
+    }
+
+    .admin-form .form-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 5px;
     }
 
     .admin-form button {
         padding: 10px 30px;
         border: none;
-        border-radius: 40px;
+        border-radius: 30px;
         font-weight: bold;
         cursor: pointer;
-        transition: transform 0.2s;
+        transition: transform 0.2s, opacity 0.2s;
         font-size: 14px;
+        white-space: nowrap;
     }
 
     .admin-form button:hover {
-        transform: scale(1.05);
+        transform: scale(1.03);
+        opacity: 0.9;
     }
 
+    /* ===== BUTTON STYLES ===== */
     .btn-primary {
         background: #ffd700;
         color: #000;
@@ -483,31 +705,38 @@ require_once 'header.php';
         color: #fff;
     }
 
+    /* ===== TABLE STYLES ===== */
     .admin-table-wrapper {
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -5px;
+        padding: 0 5px;
     }
 
     .admin-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 13px;
+        font-size: 12px;
+        min-width: 600px;
     }
 
     .admin-table th {
         background: #1a1a2e;
         color: #ffd700;
-        padding: 12px 15px;
+        padding: 10px 8px;
         text-align: center;
         font-weight: bold;
         border: 1px solid #333;
         white-space: nowrap;
+        font-size: 11px;
     }
 
     .admin-table td {
-        padding: 10px 15px;
+        padding: 8px;
         text-align: center;
         border: 1px solid #e0e0e0;
         vertical-align: middle;
+        font-size: 12px;
     }
 
     .admin-table tr:nth-child(even) {
@@ -523,31 +752,33 @@ require_once 'header.php';
         color: #000;
         font-weight: bold;
         text-align: left;
-        padding-left: 20px;
+        padding-left: 10px;
+        font-size: 12px;
     }
 
-    .admin-table .actions-cell {
+    .actions-cell {
         display: flex;
-        gap: 5px;
+        gap: 4px;
         justify-content: center;
         flex-wrap: wrap;
     }
 
-    .admin-table .actions-cell button,
-    .admin-table .actions-cell a {
-        padding: 5px 12px;
+    .actions-cell button,
+    .actions-cell a {
+        padding: 4px 8px;
         border: none;
-        border-radius: 5px;
+        border-radius: 4px;
         cursor: pointer;
         text-decoration: none;
-        font-size: 12px;
+        font-size: 10px;
         font-weight: bold;
         display: inline-block;
         transition: opacity 0.2s;
+        white-space: nowrap;
     }
 
-    .admin-table .actions-cell button:hover,
-    .admin-table .actions-cell a:hover {
+    .actions-cell button:hover,
+    .actions-cell a:hover {
         opacity: 0.8;
     }
 
@@ -561,11 +792,6 @@ require_once 'header.php';
         color: #fff;
     }
 
-    .btn-chart-edit {
-        background: #17a2b8;
-        color: #fff;
-    }
-
     .btn-toggle {
         background: #6c757d;
         color: #fff;
@@ -575,28 +801,32 @@ require_once 'header.php';
         background: #28a745;
     }
 
+    /* ===== MESSAGE STYLES ===== */
     .success-msg {
         background: #d4edda;
         color: #155724;
-        padding: 15px;
+        padding: 12px 15px;
         margin: 10px 0;
-        border-radius: 10px;
-        border-left: 5px solid #28a745;
+        border-radius: 8px;
+        border-left: 4px solid #28a745;
         text-align: center;
         font-weight: bold;
+        font-size: 14px;
     }
 
     .error-msg {
         background: #f8d7da;
         color: #721c24;
-        padding: 15px;
+        padding: 12px 15px;
         margin: 10px 0;
-        border-radius: 10px;
-        border-left: 5px solid #dc3545;
+        border-radius: 8px;
+        border-left: 4px solid #dc3545;
         text-align: center;
         font-weight: bold;
+        font-size: 14px;
     }
 
+    /* ===== MODAL STYLES ===== */
     .modal {
         display: none;
         position: fixed;
@@ -608,15 +838,16 @@ require_once 'header.php';
         z-index: 1000;
         justify-content: center;
         align-items: center;
+        padding: 15px;
     }
 
     .modal-content {
         background: #fff;
-        padding: 30px;
-        border-radius: 30px;
+        padding: 25px;
+        border-radius: 20px;
         max-width: 500px;
-        width: 90%;
-        max-height: 80vh;
+        width: 100%;
+        max-height: 85vh;
         overflow-y: auto;
         position: relative;
     }
@@ -624,8 +855,8 @@ require_once 'header.php';
     .modal-content h3 {
         color: #c49a00;
         text-align: center;
-        margin-bottom: 20px;
-        font-size: 24px;
+        margin-bottom: 15px;
+        font-size: clamp(18px, 3vw, 22px);
     }
 
     .modal-content .form-group {
@@ -634,20 +865,31 @@ require_once 'header.php';
 
     .modal-content label {
         display: block;
-        font-weight: bold;
+        font-weight: 600;
         margin-bottom: 5px;
         color: #333;
         font-size: 13px;
+        text-align: left;
     }
 
     .modal-content input,
-    .modal-content select {
+    .modal-content select,
+    .modal-content textarea {
         width: 100%;
-        padding: 12px;
-        border-radius: 10px;
-        border: 2px solid #ffd700;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 2px solid #e0e0e0;
         font-size: 14px;
         box-sizing: border-box;
+        background: #fafafa;
+    }
+
+    .modal-content input:focus,
+    .modal-content select:focus,
+    .modal-content textarea:focus {
+        border-color: #ffd700;
+        outline: none;
+        background: #fff;
     }
 
     .modal-actions {
@@ -655,19 +897,21 @@ require_once 'header.php';
         gap: 10px;
         justify-content: center;
         margin-top: 20px;
+        flex-wrap: wrap;
     }
 
     .modal-actions button {
-        padding: 12px 30px;
+        padding: 10px 30px;
         border: none;
-        border-radius: 40px;
+        border-radius: 30px;
         font-weight: bold;
         cursor: pointer;
         transition: transform 0.2s;
+        font-size: 14px;
     }
 
     .modal-actions button:hover {
-        transform: scale(1.05);
+        transform: scale(1.03);
     }
 
     .btn-save {
@@ -680,52 +924,56 @@ require_once 'header.php';
         color: #fff;
     }
 
+    /* ===== STAT CARDS ===== */
     .stat-cards {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-        margin-bottom: 30px;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
     }
 
     .stat-card {
         background: #fff;
-        padding: 20px;
-        border-radius: 15px;
+        padding: 15px;
+        border-radius: 12px;
         text-align: center;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         border: 1px solid #e0e0e0;
     }
 
     .stat-card .number {
-        font-size: 32px;
+        font-size: clamp(22px, 4vw, 30px);
         font-weight: bold;
         color: #ffd700;
     }
 
     .stat-card .label {
         color: #666;
-        font-size: 14px;
-        margin-top: 5px;
+        font-size: 12px;
+        margin-top: 3px;
     }
 
+    /* ===== TABS ===== */
     .tabs {
         display: flex;
-        gap: 10px;
+        gap: 6px;
         flex-wrap: wrap;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }
 
     .tab-btn {
-        padding: 10px 25px;
+        padding: 8px 15px;
         border: 2px solid #ffd700;
         background: transparent;
-        border-radius: 40px;
+        border-radius: 25px;
         font-weight: bold;
         cursor: pointer;
         transition: all 0.3s;
         text-decoration: none;
         display: inline-block;
         color: #000;
+        font-size: 12px;
+        white-space: nowrap;
     }
 
     .tab-btn.active {
@@ -746,61 +994,210 @@ require_once 'header.php';
         display: block;
     }
 
+    /* ===== CHART STATS ===== */
     .chart-stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 10px;
-        margin-bottom: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 8px;
+        margin-bottom: 15px;
     }
 
     .chart-stat {
         background: #f9f9f9;
-        padding: 10px 15px;
-        border-radius: 10px;
+        padding: 10px;
+        border-radius: 8px;
         text-align: center;
     }
 
     .chart-stat .number {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: bold;
         color: #c49a00;
     }
 
     .chart-stat .label {
-        font-size: 12px;
+        font-size: 11px;
         color: #666;
     }
 
-    @media(max-width: 768px) {
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .admin-container {
+            padding: 10px;
+        }
+
         .admin-header {
             flex-direction: column;
             text-align: center;
-            gap: 15px;
+            padding: 15px;
+            gap: 10px;
         }
 
-        .admin-form {
+        .admin-header .header-actions {
+            justify-content: center;
+        }
+
+        .admin-header .header-actions a {
+            font-size: 11px;
+            padding: 6px 12px;
+        }
+
+        /* Form responsive */
+        .admin-form .form-row {
             flex-direction: column;
+            gap: 10px;
         }
 
         .admin-form .form-group {
             min-width: 100%;
         }
 
+        .admin-form .form-actions {
+            flex-direction: column;
+        }
+
+        .admin-form button {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .admin-section {
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .admin-section h2 {
+            font-size: 16px;
+        }
+
         .admin-table {
-            font-size: 11px;
+            font-size: 10px;
+            min-width: 500px;
         }
 
         .admin-table th,
         .admin-table td {
-            padding: 6px 8px;
+            padding: 5px 4px;
+        }
+
+        .admin-table th {
+            font-size: 9px;
+        }
+
+        .admin-table td {
+            font-size: 10px;
+        }
+
+        .actions-cell button,
+        .actions-cell a {
+            padding: 3px 6px;
+            font-size: 9px;
         }
 
         .stat-cards {
             grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .stat-card {
+            padding: 12px;
+        }
+
+        .stat-card .number {
+            font-size: 22px;
+        }
+
+        .stat-card .label {
+            font-size: 11px;
+        }
+
+        .tabs {
+            gap: 4px;
+        }
+
+        .tab-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+        }
+
+        .modal-content {
+            padding: 15px;
+            border-radius: 15px;
+            max-height: 90vh;
+        }
+
+        .modal-actions button {
+            padding: 8px 20px;
+            font-size: 13px;
+        }
+
+        .chart-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .admin-header h1 {
+            font-size: 18px;
+        }
+
+        .admin-header .header-actions {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .admin-header .header-actions a {
+            width: 100%;
+            text-align: center;
+        }
+
+        .tab-btn {
+            padding: 5px 10px;
+            font-size: 10px;
+        }
+
+        .stat-cards {
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .stat-card {
+            padding: 10px;
+        }
+
+        .stat-card .number {
+            font-size: 20px;
+        }
+
+        .admin-table {
+            min-width: 400px;
+        }
+
+        .admin-table th,
+        .admin-table td {
+            padding: 4px 3px;
+            font-size: 9px;
+        }
+
+        .actions-cell {
+            gap: 2px;
+        }
+
+        .actions-cell button,
+        .actions-cell a {
+            padding: 2px 5px;
+            font-size: 8px;
+        }
+
+        .modal-actions {
+            flex-direction: column;
+        }
+
+        .modal-actions button {
+            width: 100%;
         }
     }
 </style>
-
 <div class="admin-container">
     <!-- Admin Header -->
     <div class="admin-header">
@@ -859,29 +1256,43 @@ require_once 'header.php';
             class="tab-btn <?php echo $current_tab === 'rates' ? 'active' : ''; ?>">💰 Rates</a>
         <a href="admin-dashboard.php?tab=multiple"
             class="tab-btn <?php echo $current_tab === 'multiple' ? 'active' : ''; ?>">📝 Multiple Results</a>
+        <a href="admin-dashboard.php?tab=settings"
+            class="tab-btn <?php echo $current_tab === 'settings' ? 'active' : ''; ?>">⚙️ Settings</a>
     </div>
 
     <!-- ==================== TAB 1: GAMES ==================== -->
     <div id="tab-games" class="tab-content <?php echo $current_tab === 'games' ? 'active' : ''; ?>">
         <!-- Edit Disawer -->
         <div class="admin-section">
-            <h2>✏️ Edit Disawer Result</h2>
+            <h2>✏️ Edit Result</h2>
             <form method="POST" class="admin-form">
                 <input type="hidden" name="update_disawer" value="1">
                 <div class="form-group">
+                    <label>Display Name:</label>
+                    <input type="text" name="disawer_display_name"
+                        value="<?php echo htmlspecialchars($disawer['display_name'] ?? 'DISAWER'); ?>"
+                        style="min-width:150px;">
+                </div>
+                <div class="form-group">
+                    <label>Time:</label>
+                    <input type="text" name="disawer_time"
+                        value="<?php echo htmlspecialchars($disawer['result_time'] ?? '5:15 AM'); ?>"
+                        style="width:120px; text-align:center;">
+                </div>
+                <div class="form-group">
                     <label>Yesterday Result:</label>
-                    <input type="text" name="disawer_yesterday" value="<?php echo $disawer_yesterday; ?>"
+                    <input type="text" name="disawer_yesterday"
+                        value="<?php echo htmlspecialchars($disawer_yesterday); ?>"
                         style="width:120px; text-align:center; font-size:18px;">
                 </div>
                 <div class="form-group">
                     <label>Today Result:</label>
-                    <input type="text" name="disawer_today" value="<?php echo $disawer_result; ?>"
+                    <input type="text" name="disawer_today" value="<?php echo htmlspecialchars($disawer_result); ?>"
                         style="width:120px; text-align:center; font-size:18px;">
                 </div>
                 <button type="submit" class="btn-primary">💾 Update Disawer</button>
             </form>
         </div>
-
         <!-- Add New Game -->
         <div class="admin-section">
             <h2>➕ Add New Game</h2>
@@ -1423,7 +1834,112 @@ require_once 'header.php';
             </div>
         </div>
     </div>
+
+    <!-- ==================== TAB 6: SETTINGS ==================== -->
+    <div id="tab-settings" class="tab-content <?php echo $current_tab === 'settings' ? 'active' : ''; ?>">
+
+        <!-- Edit Khaiwal Info -->
+        <div class="admin-section">
+            <h2>🔰 Edit Name Info</h2>
+            <form method="POST" class="admin-form">
+                <input type="hidden" name="update_khaiwal" value="1">
+                <div class="form-group">
+                    <label>Line 1:</label>
+                    <input type="text" name="khaiwal_line1"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'khaiwal_line1') ?? '🔰 *Online khaiwal* 🔰'); ?>"
+                        style="min-width:300px;">
+                </div>
+                <div class="form-group">
+                    <label>Line 2:</label>
+                    <input type="text" name="khaiwal_line2"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'khaiwal_line2') ?? '*( Raj Bhai Khaiwal )*'); ?>"
+                        style="min-width:300px;">
+                </div>
+                <button type="submit" class="btn-primary">💾 Update Khaiwal Info</button>
+            </form>
+        </div>
+
+        <!-- Edit WhatsApp Settings -->
+        <div class="admin-section">
+            <h2>📱 Edit WhatsApp Settings</h2>
+            <form method="POST" class="admin-form">
+                <input type="hidden" name="update_whatsapp" value="1">
+                <div class="form-group">
+                    <label>WhatsApp Number (with country code):</label>
+                    <input type="text" name="whatsapp_number"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'whatsapp_number') ?? '919812287328'); ?>"
+                        placeholder="919812287328" style="min-width:250px;">
+                </div>
+                <div class="form-group">
+                    <label>Button Text:</label>
+                    <input type="text" name="whatsapp_text"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'whatsapp_text') ?? 'WhatsApp'); ?>"
+                        style="min-width:200px;">
+                </div>
+                <div class="form-group">
+                    <label>Subtext:</label>
+                    <input type="text" name="whatsapp_subtext"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'whatsapp_subtext') ?? 'Click to Chat'); ?>"
+                        style="min-width:200px;">
+                </div>
+                <button type="submit" class="btn-success">💾 Update WhatsApp</button>
+            </form>
+        </div>
+
+        <!-- Edit Top WhatsApp Button -->
+        <div class="admin-section">
+            <h2>📞 Edit Top WhatsApp Card</h2>
+            <form method="POST" class="admin-form">
+                <input type="hidden" name="update_top_whatsapp" value="1">
+                <div class="form-group">
+                    <label>WhatsApp Number (with country code):</label>
+                    <input type="text" name="top_whatsapp_number"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'top_whatsapp_number') ?? '919812287328'); ?>"
+                        placeholder="919812287328" style="min-width:250px;">
+                </div>
+                <div class="form-group">
+                    <label>Card Text:</label>
+                    <textarea name="top_whatsapp_text" rows="2"
+                        style="min-width:400px;"><?php echo htmlspecialchars(getWebsiteContent($pdo, 'top_whatsapp_text') ?? '"NOW WHATSAPP PLAYERS CAN ALSO JOIN OUR WHATSAPP CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."'); ?></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Button Text:</label>
+                    <input type="text" name="top_whatsapp_btn"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'top_whatsapp_btn') ?? 'Click to chat'); ?>"
+                        style="min-width:200px;">
+                </div>
+                <button type="submit" class="btn-primary">💾 Update WhatsApp Card</button>
+            </form>
+        </div>
+
+        <!-- Edit Telegram Card -->
+        <div class="admin-section">
+            <h2>📢 Edit Telegram Card</h2>
+            <form method="POST" class="admin-form">
+                <input type="hidden" name="update_telegram" value="1">
+                <div class="form-group">
+                    <label>Telegram Link:</label>
+                    <input type="text" name="telegram_link"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'telegram_link') ?? 'https://t.me/a7Resultupdates'); ?>"
+                        style="min-width:300px;">
+                </div>
+                <div class="form-group">
+                    <label>Card Text:</label>
+                    <textarea name="telegram_text" rows="2"
+                        style="min-width:400px;"><?php echo htmlspecialchars(getWebsiteContent($pdo, 'telegram_text') ?? '"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."'); ?></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Button Text:</label>
+                    <input type="text" name="telegram_btn"
+                        value="<?php echo htmlspecialchars(getWebsiteContent($pdo, 'telegram_btn') ?? 'Click to Connect'); ?>"
+                        style="min-width:200px;">
+                </div>
+                <button type="submit" class="btn-info">💾 Update Telegram Card</button>
+            </form>
+        </div>
+    </div>
 </div>
+
 
 <!-- ==================== MODALS ==================== -->
 

@@ -3,33 +3,114 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 require_once 'config.php';
-
 // Set page title for header
 $page_title = 'A1 satta live | Delhi Bazar Satta King 2026 Results';
-
-// Define games in order
-$table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
-$table2_game_names = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
-
+// Fetch website content
+$khaiwal_line1 = getWebsiteContent($pdo, 'khaiwal_line1') ?: '🔰 *Online khaiwal* 🔰';
+$khaiwal_line2 = getWebsiteContent($pdo, 'khaiwal_line2') ?: '*( Raj Bhai Khaiwal )*';
+$whatsapp_number = getWebsiteContent($pdo, 'whatsapp_number') ?: '919812287328';
+$whatsapp_text = getWebsiteContent($pdo, 'whatsapp_text') ?: 'WhatsApp';
+$whatsapp_subtext = getWebsiteContent($pdo, 'whatsapp_subtext') ?: 'Click to Chat';
+$top_whatsapp_number = getWebsiteContent($pdo, 'top_whatsapp_number') ?: '919812287328';
+$top_whatsapp_text = getWebsiteContent($pdo, 'top_whatsapp_text') ?: '"NOW WHATSAPP PLAYERS CAN ALSO JOIN OUR WHATSAPP CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."';
+$top_whatsapp_btn = getWebsiteContent($pdo, 'top_whatsapp_btn') ?: 'Click to chat';
+$telegram_link = getWebsiteContent($pdo, 'telegram_link') ?: 'https://t.me/a7Resultupdates';
+$telegram_text = getWebsiteContent($pdo, 'telegram_text') ?: '"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."';
+$telegram_btn = getWebsiteContent($pdo, 'telegram_btn') ?: 'Click to Connect';
 // Fetch disawer result
-$disawer = getGameResults($pdo, 'disawer');
-$disawer_result = $disawer ? $disawer['today_result'] : '86';
-$disawer_yesterday = $disawer ? $disawer['yesterday_result'] : '05';
+try {
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = 'disawer'");
+    $stmt->execute();
+    $disawer = $stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $disawer = false;
+}
+$disawer_result = $disawer['today_result'] ?? '86';
+$disawer_yesterday = $disawer['yesterday_result'] ?? '05';
+$disawer_display_name = $disawer['display_name'] ?? 'DISAWER';
+$disawer_time = $disawer['result_time'] ?? '5:15 AM';
 
-// Fetch all game results
-$all_results = getAllGames($pdo);
+// Fetch all games dynamically from database
+try {
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE game_name != 'disawer' AND status = 'active' ORDER BY table_type, id");
+    $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Create lookup array and separate by table type
+    $all_results = [];
+    $table1_game_names = [];
+    $table2_game_names = [];
+
+    foreach ($all_games_data as $game) {
+        $all_results[$game['game_name']] = $game;
+        if ($game['table_type'] == 'table2') {
+            $table2_game_names[] = $game['game_name'];
+        } else {
+            $table1_game_names[] = $game['game_name'];
+        }
+    }
+
+    // Fallback if database is empty
+    if (empty($table1_game_names) && empty($table2_game_names)) {
+        $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
+        $table2_game_names = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+    }
+} catch (PDOException $e) {
+    // Fallback to default lists if database query fails
+    $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
+    $table2_game_names = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+    $all_results = [];
+}
 
 // Get table header display name
 $table_header_display = 'सट्टा का नाम';
 
-// Get game timings for display
-$game_timings = getGameTimings($pdo);
+// Fetch game timings dynamically
+try {
+    $stmt = $pdo->query("SELECT * FROM game_timings WHERE is_active = 1 ORDER BY display_order, id");
+    $game_timings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $game_timings = [];
+}
+
+// Fetch game rates dynamically
+try {
+    $stmt = $pdo->query("SELECT * FROM game_rates WHERE is_active = 1 ORDER BY display_order, id");
+    $rates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $rates = [];
+}
+
+// Fetch all game names for chart selector
+try {
+    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 'active' ORDER BY game_name");
+    $all_game_names = $stmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {
+    $all_game_names = array_merge(['disawer'], $table1_game_names, $table2_game_names);
+}
+
+// Fetch all game timings for admin editor
+if (isAdminLoggedIn()) {
+    try {
+        $stmt = $pdo->query("SELECT * FROM game_timings ORDER BY display_order, id");
+        $all_game_timings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $all_game_timings = [];
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT * FROM game_rates ORDER BY display_order, id");
+        $all_game_rates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $all_game_rates = [];
+    }
+}
 
 require_once 'header.php';
 ?>
 
 <link rel="stylesheet" href="./css/style.css">
 <meta charset="UTF-8">
+
 <!-- Success/Error Messages from admin actions -->
 <?php if (isset($_SESSION['success'])): ?>
     <div class="admin-message success-msg"
@@ -51,42 +132,39 @@ require_once 'header.php';
 <div class="live-box">
     <div id="clock" class="clock"></div>
     <h2>हा भाई यही आती हे सबसे पहले खबर रूको और देखो</h2>
-    <h1>DISAWER</h1>
-    <div class="result-number"><?php echo $disawer_result; ?></div>
+    <h1><?php echo htmlspecialchars(strtoupper($disawer_display_name)); ?></h1>
+    <div class="result-number"><?php echo htmlspecialchars($disawer_result); ?></div>
 </div>
 
-<div class="highlight">disawer</div>
-<div class="disawer-timing">5:15 AM</div>
-<div class="disawer-arrow"><?php echo $disawer_yesterday; ?> ➡️ <?php echo $disawer_result; ?></div>
+<div class="highlight"><?php echo htmlspecialchars(strtolower($disawer_display_name)); ?></div>
+<div class="disawer-timing"><?php echo htmlspecialchars($disawer_time); ?></div>
+<div class="disawer-arrow"><?php echo htmlspecialchars($disawer_yesterday); ?> ➡️
+    <?php echo htmlspecialchars($disawer_result); ?>
+</div>
 
 <!-- WhatsApp & Telegram Cards -->
 <div class="social-cards-wrapper">
     <div class="social-card whatsapp-card">
         <div class="social-card-content">
-            <p class="social-text">"NOW WHATSAPP PLAYERS CAN ALSO JOIN OUR WHATSAPP CHANNEL TO GET RESULTS QUICKLY AND
-                RECEIVE SUPERFAST RESULTS."</p>
-            <a href="https://wa.me/+919812287328" target="_blank" class="social-btn whatsapp-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
-                    <path fill="#25D366"
-                        d="M35.5,12.5C31.9,8.9,27.1,7,22,7c-8.3,0-15,6.7-15,15c0,2.7,0.7,5.3,2,7.6L7,41l11.9-3.1c2.2,1.2,4.7,1.8,7.2,1.8h0c8.3,0,15-6.7,15-15C41,18.6,39.1,14.1,35.5,12.5z" />
-                    <path fill="#FFF"
-                        d="M24.1,9.5c-7.2,0-13,5.8-13,13c0,2.3,0.6,4.5,1.7,6.4L11.7,36l7.4-1.9c1.9,1,4,1.6,6.2,1.6c7.2,0,13-5.8,13-13S31.3,9.5,24.1,9.5z M33.6,24.6c-0.5,1.5-2.6,2.8-4.2,3.1c-0.7,0.1-1.3,0.2-1.8,0.2c-0.9,0-1.9-0.3-2.9-0.9c-1.3-0.8-2.4-1.9-3.5-3c-0.9-0.9-1.8-2-2.5-3.1c-0.7-1.1-1.2-2.1-1.2-3c0-0.9,0.3-1.6,0.9-2.1c0.4-0.4,0.9-0.6,1.3-0.6c0.3,0,0.6,0,0.9,0c0.3,0,0.6,0,0.9,0.5c0.3,0.5,0.8,1.5,0.9,1.6c0.1,0.2,0.1,0.4,0,0.6c0,0.2-0.1,0.3-0.2,0.5c-0.1,0.2-0.3,0.4-0.4,0.6c-0.1,0.2-0.2,0.3-0.1,0.5c0.1,0.2,0.5,0.8,0.9,1.3c0.6,0.8,1.3,1.5,2.1,2c0.8,0.5,1.5,0.8,2.1,0.9c0.3,0.1,0.5,0.1,0.7,0c0.2-0.1,0.4-0.2,0.5-0.4c0.1-0.2,0.4-0.4,0.5-0.6c0.1-0.2,0.4-0.2,0.6-0.1c0.2,0.1,1.5,0.7,1.8,0.8c0.3,0.1,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.8-0.1,1.3C33.9,24.1,33.8,24.3,33.6,24.6z" />
-                </svg>
-                Click to chat
+            <p class="social-text">
+                <?php echo htmlspecialchars($top_whatsapp_text); ?>
+            </p>
+            <a href="https://wa.me/<?php echo htmlspecialchars($top_whatsapp_number); ?>" target="_blank"
+                class="social-btn whatsapp-btn">
+                <!-- SVG remains same -->
+                <?php echo htmlspecialchars($top_whatsapp_btn); ?>
             </a>
         </div>
     </div>
 
     <div class="social-card telegram-card">
         <div class="social-card-content">
-            <p class="social-text">"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND
-                RECEIVE SUPERFAST RESULTS."</p>
-            <a href="https://t.me/a7Resultupdates" target="_blank" class="social-btn telegram-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
-                    <path fill="#26A5E4"
-                        d="M41.4,8.9L5.9,21.9c-1.1,0.4-1.1,2,0,2.4l8.8,3.1l3.5,10.8c0.3,1,1.5,1.3,2.2,0.5l4.7-4.6l9.3,6.8c0.9,0.7,2.2,0.1,2.5-0.8l5.1-20.5C42.7,15.3,42,14.5,34.4,14.1z M25.1,27.2c-0.3,0.3-0.7,0.5-1.1,0.3c-0.4-0.2-0.5-0.6-0.4-1l0.8-4l5-4.5L25.1,27.2z" />
-                </svg>
-                Click to Connect
+            <p class="social-text">
+                <?php echo htmlspecialchars($telegram_text); ?>
+            </p>
+            <a href="<?php echo htmlspecialchars($telegram_link); ?>" target="_blank" class="social-btn telegram-btn">
+                <!-- SVG remains same -->
+                <?php echo htmlspecialchars($telegram_btn); ?>
             </a>
         </div>
     </div>
@@ -123,53 +201,61 @@ require_once 'header.php';
         </button>
     <?php endif; ?>
 
-    <p>🔰 *Online khaiwal* 🔰</p>
-    <p>*( Raj Bhai Khaiwal )*</p>
+    <p><?php echo htmlspecialchars($khaiwal_line1); ?></p>
+    <p><?php echo htmlspecialchars($khaiwal_line2); ?></p>
     <p>🎊🎊🎊🎊🎊</p>
     <p>🔰 *All game timing* 🔰</p>
 
-    <!-- Timings Container -->
+    <!-- Timings Container - Dynamic -->
     <div id="timings-container">
         <?php foreach ($game_timings as $timing): ?>
             <p data-timing-id="<?php echo $timing['id']; ?>">
-                <?php echo $timing['emoji']; ?> *<?php echo ucfirst($timing['game_name']); ?>...
-                <?php echo $timing['timing']; ?>*
+                <?php echo htmlspecialchars($timing['emoji']); ?>
+                *<?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?>...
+                <?php echo htmlspecialchars($timing['timing']); ?>*
             </p>
         <?php endforeach; ?>
+        <?php if (empty($game_timings)): ?>
+            <p>😇 *Disawer... 5:15 AM*</p>
+            <p>😇 *Gali... 11:15 PM*</p>
+        <?php endif; ?>
     </div>
 
     <p>*फोन पे, गूगल पे=* *scanner*</p>
     <p>*Rate list* *राधे राधे*</p>
 
-    <!-- Rates Container -->
+    <!-- Rates Container - Dynamic -->
     <div id="rates-container">
-        <?php
-        $rates = getGameRates($pdo);
-        foreach ($rates as $rate):
-            ?>
+        <?php foreach ($rates as $rate): ?>
             <p data-rate-id="<?php echo $rate['id']; ?>">
-                *<?php echo $rate['rate_type']; ?>=<?php echo $rate['rate_value']; ?>*
+                *<?php echo htmlspecialchars($rate['rate_type']); ?>=<?php echo htmlspecialchars($rate['rate_value']); ?>*
             </p>
         <?php endforeach; ?>
+        <?php if (empty($rates)): ?>
+            <p>*जोड़ी रेट=10 ke..960*</p>
+            <p>*हरूप रेट=10 ke..90*</p>
+        <?php endif; ?>
     </div>
 
     <p>🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻</p>
     <p>सीधे सट्टा कंपनी का No 1 खाईवाल *Game play करने के लिये नीचे क्लिक करे*</p>
     <div class="whatsapp-button">
-        <a href="https://wa.me/1234567890" target="_blank">
+        <a href="https://wa.me/<?php echo htmlspecialchars($whatsapp_number); ?>" target="_blank">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
                 <path fill="#25D366"
                     d="M35.5,12.5C31.9,8.9,27.1,7,22,7c-8.3,0-15,6.7-15,15c0,2.7,0.7,5.3,2,7.6L7,41l11.9-3.1c2.2,1.2,4.7,1.8,7.2,1.8h0c8.3,0,15-6.7,15-15C41,18.6,39.1,14.1,35.5,12.5z" />
                 <path fill="#FFF"
                     d="M24.1,9.5c-7.2,0-13,5.8-13,13c0,2.3,0.6,4.5,1.7,6.4L11.7,36l7.4-1.9c1.9,1,4,1.6,6.2,1.6c7.2,0,13-5.8,13-13S31.3,9.5,24.1,9.5z M33.6,24.6c-0.5,1.5-2.6,2.8-4.2,3.1c-0.7,0.1-1.3,0.2-1.8,0.2c-0.9,0-1.9-0.3-2.9-0.9c-1.3-0.8-2.4-1.9-3.5-3c-0.9-0.9-1.8-2-2.5-3.1c-0.7-1.1-1.2-2.1-1.2-3c0-0.9,0.3-1.6,0.9-2.1c0.4-0.4,0.9-0.6,1.3-0.6c0.3,0,0.6,0,0.9,0c0.3,0,0.6,0,0.9,0.5c0.3,0.5,0.8,1.5,0.9,1.6c0.1,0.2,0.1,0.4,0,0.6c0,0.2-0.1,0.3-0.2,0.5c-0.1,0.2-0.3,0.4-0.4,0.6c-0.1,0.2-0.2,0.3-0.1,0.5c0.1,0.2,0.5,0.8,0.9,1.3c0.6,0.8,1.3,1.5,2.1,2c0.8,0.5,1.5,0.8,2.1,0.9c0.3,0.1,0.5,0.1,0.7,0c0.2-0.1,0.4-0.2,0.5-0.4c0.1-0.2,0.4-0.4,0.5-0.6c0.1-0.2,0.4-0.2,0.6-0.1c0.2,0.1,1.5,0.7,1.8,0.8c0.3,0.1,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.8-0.1,1.3C33.9,24.1,33.8,24.3,33.6,24.6z" />
             </svg>
-            WhatsApp
-            <p>Click to Chat</p>
+            <?php echo htmlspecialchars($whatsapp_text); ?>
+            <p>
+                <?php echo htmlspecialchars($whatsapp_subtext); ?>
+            </p>
         </a>
     </div>
 </div>
 
-<!-- TABLE 1 - Main Games -->
+<!-- TABLE 1 - Main Games (Dynamic) -->
 <div class="table-wrapper">
     <table class="result-table">
         <thead>
@@ -187,10 +273,11 @@ require_once 'header.php';
                 ?>
                 <tr>
                     <td class="game-name">
-                        <a href="game.php?game=<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
-                        <span class="game-time"><?php echo $data['result_time']; ?></span>
+                        <a
+                            href="game.php?game=<?php echo urlencode(strtolower(str_replace(' ', '-', $game))); ?>"><?php echo strtoupper(htmlspecialchars($display_name)); ?></a>
+                        <span class="game-time"><?php echo htmlspecialchars($data['result_time'] ?? '--'); ?></span>
                     </td>
-                    <td class="yesterday-result"><?php echo $data['yesterday_result']; ?></td>
+                    <td class="yesterday-result"><?php echo htmlspecialchars($data['yesterday_result'] ?? '--'); ?></td>
                     <td class="today-result">
                         <?php if ($is_wait): ?>
                             <span class="wait-icon">
@@ -204,16 +291,21 @@ require_once 'header.php';
                                 WAIT
                             </span>
                         <?php else: ?>
-                            <span class="result-value"><?php echo $data['today_result']; ?></span>
+                            <span class="result-value"><?php echo htmlspecialchars($data['today_result']); ?></span>
                         <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
+            <?php if (empty($table1_game_names)): ?>
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 20px; color: #999;">No games available</td>
+                </tr>
+            <?php endif; ?>
         </tbody>
     </table>
 </div>
 
-<!-- TABLE 2 - Extra Games -->
+<!-- TABLE 2 - Extra Games (Dynamic) -->
 <div class="table-wrapper">
     <table class="result-table">
         <thead>
@@ -232,10 +324,10 @@ require_once 'header.php';
                 <tr>
                     <td class="game-name">
                         <a
-                            href="game.php?game=<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
-                        <span class="game-time"><?php echo $data['result_time']; ?></span>
+                            href="game.php?game=<?php echo urlencode(strtolower(str_replace(' ', '-', $game))); ?>"><?php echo strtoupper(htmlspecialchars($display_name)); ?></a>
+                        <span class="game-time"><?php echo htmlspecialchars($data['result_time'] ?? '--'); ?></span>
                     </td>
-                    <td class="yesterday-result"><?php echo $data['yesterday_result']; ?></td>
+                    <td class="yesterday-result"><?php echo htmlspecialchars($data['yesterday_result'] ?? '--'); ?></td>
                     <td class="today-result">
                         <?php if ($is_wait): ?>
                             <span class="wait-icon">
@@ -249,24 +341,27 @@ require_once 'header.php';
                                 WAIT
                             </span>
                         <?php else: ?>
-                            <span class="result-value"><?php echo $data['today_result']; ?></span>
+                            <span class="result-value"><?php echo htmlspecialchars($data['today_result']); ?></span>
                         <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
+            <?php if (empty($table2_game_names)): ?>
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 20px; color: #999;">No games available</td>
+                </tr>
+            <?php endif; ?>
         </tbody>
     </table>
 </div>
 
-<!-- Chart Selector -->
+<!-- Chart Selector - Dynamic -->
 <div class="chart-selector">
     <select id="chartGameSelect">
         <option value="">-- Select Game --</option>
-        <?php
-        $all_game_names = getGameNames($pdo);
-        foreach ($all_game_names as $game):
-            ?>
-            <option value="<?php echo $game; ?>"><?php echo strtoupper($game); ?></option>
+        <?php foreach ($all_game_names as $game): ?>
+            <option value="<?php echo htmlspecialchars($game); ?>"><?php echo strtoupper(htmlspecialchars($game)); ?>
+            </option>
         <?php endforeach; ?>
     </select>
     <select id="chartYearSelect">
@@ -331,7 +426,7 @@ require_once 'header.php';
             <div id="timingsTab">
                 <div style="background: #f9f9f9; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #1a1a2e;">➕ Add New Timing</h3>
-                    <form id="addTimingForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form id="addTimingForm" style="display: flex; gap: 10px; flex-wrap: wrap;" onsubmit="return false;">
                         <input type="text" id="newTimingGame" placeholder="Game Name"
                             style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <input type="text" id="newTimingTime" placeholder="Time (e.g. 5:15 AM)"
@@ -355,11 +450,14 @@ require_once 'header.php';
                             </tr>
                         </thead>
                         <tbody id="timingsList">
-                            <?php foreach (getAllGameTimings($pdo) as $timing): ?>
+                            <?php foreach ($all_game_timings as $timing): ?>
                                 <tr id="timing-row-<?php echo $timing['id']; ?>" style="border-bottom: 1px solid #eee;">
-                                    <td style="padding: 8px; font-size: 24px;"><?php echo $timing['emoji']; ?></td>
-                                    <td style="padding: 8px;"><strong><?php echo ucfirst($timing['game_name']); ?></strong></td>
-                                    <td style="padding: 8px;"><?php echo $timing['timing']; ?></td>
+                                    <td style="padding: 8px; font-size: 24px;"><?php echo htmlspecialchars($timing['emoji']); ?>
+                                    </td>
+                                    <td style="padding: 8px;">
+                                        <strong><?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?></strong>
+                                    </td>
+                                    <td style="padding: 8px;"><?php echo htmlspecialchars($timing['timing']); ?></td>
                                     <td style="padding: 8px; text-align: center;">
                                         <button onclick="editTiming(<?php echo $timing['id']; ?>)"
                                             style="padding: 5px 12px; background: #ffd700; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">✏️</button>
@@ -377,7 +475,7 @@ require_once 'header.php';
             <div id="ratesTab" style="display: none;">
                 <div style="background: #f9f9f9; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #1a1a2e;">➕ Add New Rate</h3>
-                    <form id="addRateForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form id="addRateForm" style="display: flex; gap: 10px; flex-wrap: wrap;" onsubmit="return false;">
                         <input type="text" id="newRateType" placeholder="Rate Type (e.g. जोड़ी रेट)"
                             style="flex: 1; min-width: 150px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <input type="text" id="newRateValue" placeholder="Rate Value (e.g. 10 ke..960)"
@@ -398,10 +496,12 @@ require_once 'header.php';
                             </tr>
                         </thead>
                         <tbody id="ratesList">
-                            <?php foreach (getAllGameRates($pdo) as $rate): ?>
+                            <?php foreach ($all_game_rates as $rate): ?>
                                 <tr id="rate-row-<?php echo $rate['id']; ?>" style="border-bottom: 1px solid #eee;">
-                                    <td style="padding: 8px;"><strong><?php echo $rate['rate_type']; ?></strong></td>
-                                    <td style="padding: 8px;"><?php echo $rate['rate_value']; ?></td>
+                                    <td style="padding: 8px;">
+                                        <strong><?php echo htmlspecialchars($rate['rate_type']); ?></strong>
+                                    </td>
+                                    <td style="padding: 8px;"><?php echo htmlspecialchars($rate['rate_value']); ?></td>
                                     <td style="padding: 8px; text-align: center;">
                                         <button onclick="editRate(<?php echo $rate['id']; ?>)"
                                             style="padding: 5px 12px; background: #ffd700; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">✏️</button>
@@ -415,7 +515,7 @@ require_once 'header.php';
                 </div>
             </div>
 
-            <!-- Edit Forms -->
+            <!-- Edit Timing Form -->
             <div id="editTimingForm"
                 style="display: none; background: #fff8e7; padding: 20px; border-radius: 15px; margin-top: 20px; border: 2px solid #ffd700;">
                 <h3 style="margin-top: 0; color: #c49a00;">✏️ Edit Timing</h3>
@@ -435,6 +535,7 @@ require_once 'header.php';
                 </div>
             </div>
 
+            <!-- Edit Rate Form -->
             <div id="editRateForm"
                 style="display: none; background: #fff8e7; padding: 20px; border-radius: 15px; margin-top: 20px; border: 2px solid #ffd700;">
                 <h3 style="margin-top: 0; color: #c49a00;">✏️ Edit Rate</h3>
@@ -453,6 +554,175 @@ require_once 'header.php';
             </div>
         </div>
     </div>
+
+    <!-- Admin AJAX Handler Script -->
+    <script>
+        // ============ TIMINGS CRUD ============
+        function openPlayTimeEditor() {
+            document.getElementById('playTimeEditorModal').style.display = 'flex';
+        }
+
+        function closePlayTimeEditor() {
+            document.getElementById('playTimeEditorModal').style.display = 'none';
+        }
+
+        function showPlayTimeTab(tab) {
+            document.getElementById('timingsTab').style.display = tab === 'timings' ? 'block' : 'none';
+            document.getElementById('ratesTab').style.display = tab === 'rates' ? 'block' : 'none';
+            document.getElementById('tabTimingsBtn').style.background = tab === 'timings' ? '#ffd700' : '#e0e0e0';
+            document.getElementById('tabRatesBtn').style.background = tab === 'rates' ? '#ffd700' : '#e0e0e0';
+        }
+
+        function addTiming() {
+            const game = document.getElementById('newTimingGame').value;
+            const time = document.getElementById('newTimingTime').value;
+            const emoji = document.getElementById('newTimingEmoji').value || '😇';
+
+            if (!game || !time) { alert('Please fill all fields'); return; }
+
+            fetch('ajax-handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=add_timing&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        }
+
+        function editTiming(id) {
+            const row = document.getElementById('timing-row-' + id);
+            const cells = row.querySelectorAll('td');
+            document.getElementById('editTimingId').value = id;
+            document.getElementById('editTimingGame').value = cells[1].innerText.trim();
+            document.getElementById('editTimingTime').value = cells[2].innerText.trim();
+            document.getElementById('editTimingEmoji').value = cells[0].innerText.trim();
+            document.getElementById('editTimingForm').style.display = 'block';
+            document.getElementById('editRateForm').style.display = 'none';
+        }
+
+        function updateTiming() {
+            const id = document.getElementById('editTimingId').value;
+            const game = document.getElementById('editTimingGame').value;
+            const time = document.getElementById('editTimingTime').value;
+            const emoji = document.getElementById('editTimingEmoji').value;
+
+            fetch('ajax-handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=update_timing&id=${id}&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        }
+
+        function deleteTiming(id) {
+            if (!confirm('Delete this timing?')) return;
+
+            fetch('ajax-handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=delete_timing&id=${id}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        }
+
+        function cancelEditTiming() {
+            document.getElementById('editTimingForm').style.display = 'none';
+        }
+
+        // ============ RATES CRUD ============
+        function addRate() {
+            const type = document.getElementById('newRateType').value;
+            const value = document.getElementById('newRateValue').value;
+
+            if (!type || !value) { alert('Please fill all fields'); return; }
+
+            fetch('ajax-handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=add_rate&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        }
+
+        function editRate(id) {
+            const row = document.getElementById('rate-row-' + id);
+            const cells = row.querySelectorAll('td');
+            document.getElementById('editRateId').value = id;
+            document.getElementById('editRateType').value = cells[0].innerText.trim();
+            document.getElementById('editRateValue').value = cells[1].innerText.trim();
+            document.getElementById('editRateForm').style.display = 'block';
+            document.getElementById('editTimingForm').style.display = 'none';
+        }
+
+        function updateRate() {
+            const id = document.getElementById('editRateId').value;
+            const type = document.getElementById('editRateType').value;
+            const value = document.getElementById('editRateValue').value;
+
+            fetch('ajax-handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=update_rate&id=${id}&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        }
+
+        function deleteRate(id) {
+            if (!confirm('Delete this rate?')) return;
+
+            fetch('ajax-handler.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=delete_rate&id=${id}`
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        }
+
+        function cancelEditRate() {
+            document.getElementById('editRateForm').style.display = 'none';
+        }
+    </script>
 <?php endif; ?>
 
 <!-- Content Section -->
