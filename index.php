@@ -1,10 +1,15 @@
 <?php
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 require_once 'config.php';
+
 // Set page title for header
 $page_title = 'A1 satta live | Delhi Bazar Satta King 2026 Results';
+
 // Fetch website content
 $khaiwal_line1 = getWebsiteContent($pdo, 'khaiwal_line1') ?: '🔰 *Online khaiwal* 🔰';
 $khaiwal_line2 = getWebsiteContent($pdo, 'khaiwal_line2') ?: '*( Raj Bhai Khaiwal )*';
@@ -17,9 +22,10 @@ $top_whatsapp_btn = getWebsiteContent($pdo, 'top_whatsapp_btn') ?: 'Click to cha
 $telegram_link = getWebsiteContent($pdo, 'telegram_link') ?: 'https://t.me/a7Resultupdates';
 $telegram_text = getWebsiteContent($pdo, 'telegram_text') ?: '"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."';
 $telegram_btn = getWebsiteContent($pdo, 'telegram_btn') ?: 'Click to Connect';
-// Fetch disawer result
+
+// Fetch disawer result - Updated for new schema
 try {
-    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = 'disawer'");
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = 'disawar' AND status = 1");
     $stmt->execute();
     $disawer = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -27,12 +33,16 @@ try {
 }
 $disawer_result = $disawer['today_result'] ?? '86';
 $disawer_yesterday = $disawer['yesterday_result'] ?? '05';
-$disawer_display_name = $disawer['display_name'] ?? 'DISAWER';
+$disawer_display_name = $disawer['display_name'] ?? 'DISAWAR';
 $disawer_time = $disawer['result_time'] ?? '5:15 AM';
 
-// Fetch all games dynamically from database
+// ===== FORCE FRESH DATA FROM DATABASE =====
+$pdo->query("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
+
+// Fetch all games dynamically from database - Updated for new schema
 try {
-    $stmt = $pdo->query("SELECT * FROM game_results WHERE game_name != 'disawer' AND status = 'active' ORDER BY table_type, id");
+    // Force fresh query with NO CACHE and status = 1 (active)
+    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 ORDER BY table_type, id");
     $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Create lookup array and separate by table type
@@ -41,7 +51,9 @@ try {
     $table2_game_names = [];
 
     foreach ($all_games_data as $game) {
-        $all_results[$game['game_name']] = $game;
+        // Use game_name as key (lowercase for consistency)
+        $key = strtolower($game['game_name']);
+        $all_results[$key] = $game;
         if ($game['table_type'] == 'table2') {
             $table2_game_names[] = $game['game_name'];
         } else {
@@ -51,13 +63,13 @@ try {
 
     // Fallback if database is empty
     if (empty($table1_game_names) && empty($table2_game_names)) {
-        $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
-        $table2_game_names = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+        $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
+        $table2_game_names = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
     }
 } catch (PDOException $e) {
     // Fallback to default lists if database query fails
-    $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
-    $table2_game_names = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+    $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
+    $table2_game_names = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
     $all_results = [];
 }
 
@@ -80,12 +92,12 @@ try {
     $rates = [];
 }
 
-// Fetch all game names for chart selector
+// Fetch all game names for chart selector - Updated for new schema
 try {
-    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 'active' ORDER BY game_name");
+    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
     $all_game_names = $stmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {
-    $all_game_names = array_merge(['disawer'], $table1_game_names, $table2_game_names);
+    $all_game_names = array_merge(['disawar'], $table1_game_names, $table2_game_names);
 }
 
 // Fetch all game timings for admin editor
@@ -129,17 +141,56 @@ require_once 'header.php';
 <?php endif; ?>
 
 <!-- Live Box -->
+<?php
+// Get the most recently updated game (for live box) - Updated for new schema
+try {
+    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 AND is_latest = 1 ORDER BY id DESC LIMIT 1");
+    $latest_game = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    // If no other game found, use disawar
+    if (!$latest_game) {
+        $latest_game = $disawer;
+    }
+} catch (PDOException $e) {
+    // If is_latest column doesn't exist, use disawar
+    $latest_game = $disawer;
+}
+
+$live_game_name = !empty($latest_game['display_name']) ? $latest_game['display_name'] : strtoupper($latest_game['game_name']);
+$live_result = $latest_game['today_result'] ?? 'WAIT';
+$live_yesterday = $latest_game['yesterday_result'] ?? '--';
+$live_time = $latest_game['result_time'] ?? '--';
+?>
+
 <div class="live-box">
     <div id="clock" class="clock"></div>
     <h2>हा भाई यही आती हे सबसे पहले खबर रूको और देखो</h2>
-    <h1><?php echo htmlspecialchars(strtoupper($disawer_display_name)); ?></h1>
-    <div class="result-number"><?php echo htmlspecialchars($disawer_result); ?></div>
+    <h1><?php echo htmlspecialchars(strtoupper($live_game_name)); ?></h1>
+    <div class="result-number">
+        <?php
+        if ($live_result == 'WAIT' || $live_result == '-1' || empty($live_result)) {
+            echo '<span style="color: #d32f2f; font-size: 24px;">⏳ WAIT</span>';
+        } else {
+            echo htmlspecialchars($live_result);
+        }
+        ?>
+    </div>
+    <div style="font-size: 14px; color: #aaa; margin-top: 10px;">
+        ⏰ <?php echo htmlspecialchars($live_time); ?>
+    </div>
 </div>
 
-<div class="highlight"><?php echo htmlspecialchars(strtolower($disawer_display_name)); ?></div>
-<div class="disawer-timing"><?php echo htmlspecialchars($disawer_time); ?></div>
-<div class="disawer-arrow"><?php echo htmlspecialchars($disawer_yesterday); ?> ➡️
-    <?php echo htmlspecialchars($disawer_result); ?>
+<div class="highlight"><?php echo htmlspecialchars(strtolower($live_game_name)); ?></div>
+<div class="disawer-timing"><?php echo htmlspecialchars($live_time); ?></div>
+<div class="disawer-arrow">
+    <?php echo htmlspecialchars($live_yesterday); ?> ➡️
+    <?php
+    if ($live_result == 'WAIT' || $live_result == '-1' || empty($live_result)) {
+        echo 'WAIT';
+    } else {
+        echo htmlspecialchars($live_result);
+    }
+    ?>
 </div>
 
 <!-- WhatsApp & Telegram Cards -->
@@ -151,7 +202,6 @@ require_once 'header.php';
             </p>
             <a href="https://wa.me/<?php echo htmlspecialchars($top_whatsapp_number); ?>" target="_blank"
                 class="social-btn whatsapp-btn">
-                <!-- SVG remains same -->
                 <?php echo htmlspecialchars($top_whatsapp_btn); ?>
             </a>
         </div>
@@ -163,21 +213,14 @@ require_once 'header.php';
                 <?php echo htmlspecialchars($telegram_text); ?>
             </p>
             <a href="<?php echo htmlspecialchars($telegram_link); ?>" target="_blank" class="social-btn telegram-btn">
-                <!-- SVG remains same -->
                 <?php echo htmlspecialchars($telegram_btn); ?>
             </a>
         </div>
     </div>
 </div>
 
-<!-- Notification Cards -->
-<div class="notification-card">
-    <h2>A1SATTA DISAWER CHART FOR <?php echo date('Y'); ?> IS AVAILABLE</h2>
-</div>
-
 <!-- Game Timings -->
 <div id="play-time-info" style="position: relative;">
-    <!-- Admin Edit Button - Visible only when logged in -->
     <?php if (isAdminLoggedIn()): ?>
         <button onclick="openPlayTimeEditor()" style="
             position: absolute;
@@ -206,7 +249,6 @@ require_once 'header.php';
     <p>🎊🎊🎊🎊🎊</p>
     <p>🔰 *All game timing* 🔰</p>
 
-    <!-- Timings Container - Dynamic -->
     <div id="timings-container">
         <?php foreach ($game_timings as $timing): ?>
             <p data-timing-id="<?php echo $timing['id']; ?>">
@@ -216,7 +258,7 @@ require_once 'header.php';
             </p>
         <?php endforeach; ?>
         <?php if (empty($game_timings)): ?>
-            <p>😇 *Disawer... 5:15 AM*</p>
+            <p>😇 *Disawar... 5:15 AM*</p>
             <p>😇 *Gali... 11:15 PM*</p>
         <?php endif; ?>
     </div>
@@ -224,7 +266,6 @@ require_once 'header.php';
     <p>*फोन पे, गूगल पे=* *scanner*</p>
     <p>*Rate list* *राधे राधे*</p>
 
-    <!-- Rates Container - Dynamic -->
     <div id="rates-container">
         <?php foreach ($rates as $rate): ?>
             <p data-rate-id="<?php echo $rate['id']; ?>">
@@ -267,7 +308,9 @@ require_once 'header.php';
         </thead>
         <tbody>
             <?php foreach ($table1_game_names as $game):
-                $data = $all_results[$game] ?? ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
+                // Get data from all_results using lowercase key for consistency
+                $key = strtolower($game);
+                $data = isset($all_results[$key]) ? $all_results[$key] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
                 $display_name = !empty($data['display_name']) ? $data['display_name'] : strtoupper($game);
                 $is_wait = ($data['today_result'] == 'WAIT' || $data['today_result'] == '-1' || empty($data['today_result']));
                 ?>
@@ -317,7 +360,9 @@ require_once 'header.php';
         </thead>
         <tbody>
             <?php foreach ($table2_game_names as $game):
-                $data = $all_results[$game] ?? ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
+                // Get data from all_results using lowercase key for consistency
+                $key = strtolower($game);
+                $data = isset($all_results[$key]) ? $all_results[$key] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
                 $display_name = !empty($data['display_name']) ? $data['display_name'] : strtoupper($game);
                 $is_wait = ($data['today_result'] == 'WAIT' || $data['today_result'] == '-1' || empty($data['today_result']));
                 ?>
@@ -405,13 +450,11 @@ require_once 'header.php';
         style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
         <div
             style="background: #fff; border-radius: 30px; padding: 30px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; position: relative;">
-            <!-- Close Button -->
             <button onclick="closePlayTimeEditor()"
                 style="position: sticky; top: 0; float: right; background: #dc3545; color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 24px; cursor: pointer; z-index: 10;">✕</button>
 
             <h2 style="color: #1a1a2e; text-align: center; margin-bottom: 30px;">✏️ Edit Play Time Info</h2>
 
-            <!-- Tabs -->
             <div
                 style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
                 <button onclick="showPlayTimeTab('timings')" id="tabTimingsBtn"
@@ -422,7 +465,6 @@ require_once 'header.php';
                     Rates</button>
             </div>
 
-            <!-- Timings Tab -->
             <div id="timingsTab">
                 <div style="background: #f9f9f9; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #1a1a2e;">➕ Add New Timing</h3>
@@ -471,7 +513,6 @@ require_once 'header.php';
                 </div>
             </div>
 
-            <!-- Rates Tab -->
             <div id="ratesTab" style="display: none;">
                 <div style="background: #f9f9f9; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #1a1a2e;">➕ Add New Rate</h3>
@@ -515,7 +556,6 @@ require_once 'header.php';
                 </div>
             </div>
 
-            <!-- Edit Timing Form -->
             <div id="editTimingForm"
                 style="display: none; background: #fff8e7; padding: 20px; border-radius: 15px; margin-top: 20px; border: 2px solid #ffd700;">
                 <h3 style="margin-top: 0; color: #c49a00;">✏️ Edit Timing</h3>
@@ -535,7 +575,6 @@ require_once 'header.php';
                 </div>
             </div>
 
-            <!-- Edit Rate Form -->
             <div id="editRateForm"
                 style="display: none; background: #fff8e7; padding: 20px; border-radius: 15px; margin-top: 20px; border: 2px solid #ffd700;">
                 <h3 style="margin-top: 0; color: #c49a00;">✏️ Edit Rate</h3>
@@ -555,7 +594,6 @@ require_once 'header.php';
         </div>
     </div>
 
-    <!-- Admin AJAX Handler Script -->
     <script>
         // ============ TIMINGS CRUD ============
         function openPlayTimeEditor() {
@@ -822,7 +860,6 @@ require_once 'header.php';
     You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
 </div>
 
-<!-- Include JavaScript file -->
 <script src="js/chart-functions.js"></script>
 
-<?php require_once 'footer.php'; ?>
+<?

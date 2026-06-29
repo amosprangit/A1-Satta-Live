@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php';
+require_once '../config.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -18,7 +18,7 @@ function writeAdminLog($message)
 }
 
 // ============================================
-// UPDATE RESULT - Handles ALL Games
+// UPDATE RESULT - THE FIX
 // ============================================
 if (isset($_POST['update_result'])) {
     writeAdminLog("=== UPDATE ATTEMPT ===");
@@ -29,14 +29,13 @@ if (isset($_POST['update_result'])) {
         $new_result = trim($_POST['today_result']);
         $display_name = trim($_POST['display_name']);
         $result_time = trim($_POST['result_time']);
-        $yesterday_result = trim($_POST['yesterday_result'] ?? '');
 
         writeAdminLog("Game Name: " . $game_name);
         writeAdminLog("New Result: " . $new_result);
 
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = LOWER(?) AND status = 1");
+        $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = LOWER(?)");
         $stmt->execute([$game_name]);
         $game = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -47,24 +46,11 @@ if (isset($_POST['update_result'])) {
             writeAdminLog("✅ Found game ID: " . $game_id);
             writeAdminLog("Current Today: " . $current_today);
 
-            // Always update - if user manually sets yesterday, use it, otherwise auto-move
-            if (!empty($yesterday_result) && $yesterday_result !== '--') {
-                // User manually set yesterday
-                $stmt = $pdo->prepare("UPDATE game_results SET 
-                    today_result = ?, 
-                    yesterday_result = ?, 
-                    result_time = ?, 
-                    display_name = ?,
-                    is_latest = 1
-                    WHERE id = ?");
-                $stmt->execute([$new_result, $yesterday_result, $result_time, $display_name, $game_id]);
-                writeAdminLog("Action: Manual update with custom yesterday result");
-            } else if ($current_today === 'WAIT' || $current_today === '-1' || empty($current_today)) {
+            if ($current_today === 'WAIT' || $current_today === '-1' || empty($current_today)) {
                 $stmt = $pdo->prepare("UPDATE game_results SET 
                     today_result = ?, 
                     result_time = ?, 
-                    display_name = ?,
-                    is_latest = 1
+                    display_name = ?
                     WHERE id = ?");
                 $stmt->execute([$new_result, $result_time, $display_name, $game_id]);
                 writeAdminLog("Action: WAIT replaced with new result");
@@ -73,8 +59,7 @@ if (isset($_POST['update_result'])) {
                     today_result = ?, 
                     yesterday_result = ?, 
                     result_time = ?, 
-                    display_name = ?,
-                    is_latest = 1
+                    display_name = ?
                     WHERE id = ?");
                 $stmt->execute([$new_result, $current_today, $result_time, $display_name, $game_id]);
                 writeAdminLog("Action: Result moved from today to yesterday");
@@ -82,19 +67,19 @@ if (isset($_POST['update_result'])) {
 
             writeAdminLog("Rows affected: " . $stmt->rowCount());
 
-            // Save to chart data
             if ($new_result !== 'WAIT' && !empty($new_result) && $new_result !== '-1') {
-                $chart_date = date('Y-m-d');
+                $date = date('d-m');
+                $table_type = $game['table_type'] ?? 'table1';
 
-                $stmt = $pdo->prepare("SELECT id FROM chart_data WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
-                $stmt->execute([$game_name, $chart_date]);
+                $stmt = $pdo->prepare("SELECT id FROM chart_data WHERE LOWER(game_name) = LOWER(?) AND date = ?");
+                $stmt->execute([$game_name, $date]);
 
                 if ($stmt->rowCount() > 0) {
-                    $stmt = $pdo->prepare("UPDATE chart_data SET result = ? WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
-                    $stmt->execute([$new_result, $game_name, $chart_date]);
+                    $stmt = $pdo->prepare("UPDATE chart_data SET result_number = ? WHERE LOWER(game_name) = LOWER(?) AND date = ?");
+                    $stmt->execute([$new_result, $game_name, $date]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, chart_date, result) VALUES (?, ?, ?)");
-                    $stmt->execute([$game_name, $chart_date, $new_result]);
+                    $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([$game_name, $date, $new_result, $table_type]);
                 }
             }
 
@@ -140,14 +125,13 @@ if (isset($_POST['add_game'])) {
                 yesterday_result = ?, 
                 result_time = ?, 
                 table_type = ?, 
-                status = 1,
-                is_latest = 1
+                status = 'active'
                 WHERE LOWER(game_name) = LOWER(?)");
             $stmt->execute([$display_name, $today_result, $yesterday_result, $result_time, $table_type, $game_name]);
             $_SESSION['success'] = "✅ Game '" . htmlspecialchars(ucfirst($game_name)) . "' updated successfully!";
         } else {
-            $stmt = $pdo->prepare("INSERT INTO game_results (game_name, display_name, today_result, yesterday_result, result_time, table_type, status, is_latest) 
-                                   VALUES (?, ?, ?, ?, ?, ?, 1, 1)");
+            $stmt = $pdo->prepare("INSERT INTO game_results (game_name, display_name, today_result, yesterday_result, result_time, table_type, status) 
+                                   VALUES (?, ?, ?, ?, ?, ?, 'active')");
             $stmt->execute([$game_name, $display_name, $today_result, $yesterday_result, $result_time, $table_type]);
             $_SESSION['success'] = "✅ Game '" . htmlspecialchars(ucfirst($game_name)) . "' added successfully!";
         }
@@ -159,15 +143,33 @@ if (isset($_POST['add_game'])) {
 }
 
 // ============================================
-// TOGGLE GAME STATUS
+// UPDATE DISAWER
 // ============================================
-if (isset($_GET['toggle_game'])) {
+if (isset($_POST['update_disawer'])) {
     try {
-        $stmt = $pdo->prepare("UPDATE game_results SET status = CASE WHEN status = 1 THEN 0 ELSE 1 END WHERE LOWER(game_name) = LOWER(?)");
-        $stmt->execute([$_GET['toggle_game']]);
-        $_SESSION['success'] = "✅ Game status toggled!";
+        $display_name = $_POST['disawer_display_name'] ?? 'DISAWAR';
+        $time = $_POST['disawer_time'] ?? '5:15 AM';
+        $today = $_POST['disawer_today'] ?? '86';
+        $yesterday = $_POST['disawer_yesterday'] ?? '05';
+
+        $stmt = $pdo->prepare("UPDATE game_results SET 
+            today_result = ?, 
+            yesterday_result = ?, 
+            result_time = ?, 
+            display_name = ?
+            WHERE LOWER(game_name) = 'disawar'");
+        $stmt->execute([$today, $yesterday, $time, $display_name]);
+
+        if ($stmt->rowCount() > 0) {
+            $_SESSION['success'] = "✅ Disawar updated successfully!";
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO game_results (game_name, display_name, today_result, yesterday_result, result_time, status, table_type) 
+                                   VALUES ('disawar', ?, ?, ?, ?, 'active', 'table1')");
+            $stmt->execute([$display_name, $today, $yesterday, $time]);
+            $_SESSION['success'] = "✅ Disawar created successfully!";
+        }
     } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to toggle game status!";
+        $_SESSION['error'] = "❌ Failed to update Disawar: " . $e->getMessage();
     }
     header('Location: admin-dashboard.php');
     exit();
@@ -178,21 +180,17 @@ if (isset($_GET['toggle_game'])) {
 // ============================================
 if (isset($_POST['update_chart'])) {
     try {
-        $chart_date = $_POST['chart_date'];
-        $game_name = $_POST['chart_game'];
-        $result = $_POST['chart_result'];
-
-        $stmt = $pdo->prepare("SELECT id FROM chart_data WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
-        $stmt->execute([$game_name, $chart_date]);
+        $stmt = $pdo->prepare("SELECT id FROM chart_data WHERE game_name = ? AND date = ? AND table_type = ?");
+        $stmt->execute([$_POST['chart_game'], $_POST['chart_date'], $_POST['chart_table_type']]);
 
         if ($stmt->rowCount() > 0) {
-            $stmt = $pdo->prepare("UPDATE chart_data SET result = ? WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
-            $stmt->execute([$result, $game_name, $chart_date]);
+            $stmt = $pdo->prepare("UPDATE chart_data SET result_number = ? WHERE game_name = ? AND date = ? AND table_type = ?");
+            $stmt->execute([$_POST['chart_result'], $_POST['chart_game'], $_POST['chart_date'], $_POST['chart_table_type']]);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, chart_date, result) VALUES (?, ?, ?)");
-            $stmt->execute([$game_name, $chart_date, $result]);
+            $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$_POST['chart_game'], $_POST['chart_date'], $_POST['chart_result'], $_POST['chart_table_type']]);
         }
-        $_SESSION['success'] = "✅ Chart updated for " . htmlspecialchars(ucfirst($game_name)) . " on " . htmlspecialchars($chart_date);
+        $_SESSION['success'] = "✅ Chart updated for " . htmlspecialchars(ucfirst($_POST['chart_game'])) . " on " . htmlspecialchars($_POST['chart_date']);
     } catch (PDOException $e) {
         $_SESSION['error'] = "❌ Failed to update chart!";
     }
@@ -217,14 +215,23 @@ if (isset($_POST['generate_month_chart'])) {
     $days_in_month = cal_days_in_month(CAL_GREGORIAN, (int) $month, (int) $year);
     $sample_results = ['12', '45', '78', '23', '56', '89', '34', '67', '90', '15', '48', '71', '29', '53', '86', '41', '74', '18', '62', '95', '37', '50', '83', '26', '59', '92', '35', '68', '10', '43', '76'];
 
+    try {
+        $stmt = $pdo->prepare("SELECT table_type FROM game_results WHERE LOWER(game_name) = LOWER(?)");
+        $stmt->execute([$game]);
+        $game_info = $stmt->fetch(PDO::FETCH_ASSOC);
+        $table_type = $game_info ? $game_info['table_type'] : 'table1';
+    } catch (PDOException $e) {
+        $table_type = 'table1';
+    }
+
     $count = 0;
     for ($day = 1; $day <= $days_in_month; $day++) {
-        $date_str = date('Y-m-d', strtotime("$year-$month-$day"));
+        $date_str = str_pad($day, 2, '0', STR_PAD_LEFT) . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
         $result = $sample_results[array_rand($sample_results)];
 
         try {
-            $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, chart_date, result) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE result = ?");
-            $stmt->execute([$game, $date_str, $result, $result]);
+            $stmt = $pdo->prepare("INSERT INTO chart_data (game_name, date, result_number, table_type) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE result_number = ?");
+            $stmt->execute([$game, $date_str, $result, $table_type, $result]);
             if ($stmt->rowCount() > 0)
                 $count++;
         } catch (PDOException $e) {
@@ -236,21 +243,6 @@ if (isset($_POST['generate_month_chart'])) {
         $_SESSION['success'] = "✅ Generated/Updated $count entries for " . htmlspecialchars(ucfirst($game));
     } else {
         $_SESSION['error'] = "❌ Failed to generate chart data!";
-    }
-    header('Location: admin-dashboard.php?tab=chart');
-    exit();
-}
-
-// ============================================
-// DELETE CHART DATA
-// ============================================
-if (isset($_GET['delete_chart'])) {
-    try {
-        $stmt = $pdo->prepare("DELETE FROM chart_data WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
-        $stmt->execute([$_GET['delete_chart'], $_GET['chart_date']]);
-        $_SESSION['success'] = "🗑️ Chart data deleted successfully!";
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to delete chart data!";
     }
     header('Location: admin-dashboard.php?tab=chart');
     exit();
@@ -279,30 +271,6 @@ if (isset($_POST['update_timing'])) {
         $_SESSION['success'] = "✅ Game timing updated!";
     } catch (PDOException $e) {
         $_SESSION['error'] = "❌ Failed to update timing!";
-    }
-    header('Location: admin-dashboard.php?tab=timings');
-    exit();
-}
-
-if (isset($_GET['toggle_timing'])) {
-    try {
-        $stmt = $pdo->prepare("UPDATE game_timings SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
-        $stmt->execute([$_GET['toggle_timing']]);
-        $_SESSION['success'] = "✅ Timing status toggled!";
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to toggle timing!";
-    }
-    header('Location: admin-dashboard.php?tab=timings');
-    exit();
-}
-
-if (isset($_GET['delete_timing'])) {
-    try {
-        $stmt = $pdo->prepare("DELETE FROM game_timings WHERE id = ?");
-        $stmt->execute([$_GET['delete_timing']]);
-        $_SESSION['success'] = "🗑️ Game timing deleted!";
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to delete timing!";
     }
     header('Location: admin-dashboard.php?tab=timings');
     exit();
@@ -337,30 +305,6 @@ if (isset($_POST['update_rate'])) {
     exit();
 }
 
-if (isset($_GET['toggle_rate'])) {
-    try {
-        $stmt = $pdo->prepare("UPDATE game_rates SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
-        $stmt->execute([$_GET['toggle_rate']]);
-        $_SESSION['success'] = "✅ Rate status toggled!";
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to toggle rate!";
-    }
-    header('Location: admin-dashboard.php?tab=rates');
-    exit();
-}
-
-if (isset($_GET['delete_rate'])) {
-    try {
-        $stmt = $pdo->prepare("DELETE FROM game_rates WHERE id = ?");
-        $stmt->execute([$_GET['delete_rate']]);
-        $_SESSION['success'] = "🗑️ Game rate deleted!";
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to delete rate!";
-    }
-    header('Location: admin-dashboard.php?tab=rates');
-    exit();
-}
-
 // ============================================
 // MULTIPLE RESULTS CRUD
 // ============================================
@@ -388,18 +332,6 @@ if (isset($_POST['update_multiple_result'])) {
     exit();
 }
 
-if (isset($_GET['delete_multiple_result'])) {
-    try {
-        $stmt = $pdo->prepare("DELETE FROM game_multiple_results WHERE id = ?");
-        $stmt->execute([$_GET['delete_multiple_result']]);
-        $_SESSION['success'] = "🗑️ Result deleted!";
-    } catch (PDOException $e) {
-        $_SESSION['error'] = "❌ Failed to delete result!";
-    }
-    header('Location: admin-dashboard.php?tab=multiple');
-    exit();
-}
-
 // ============================================
 // UPDATE FEATURED GAME
 // ============================================
@@ -411,7 +343,7 @@ if (isset($_POST['update_featured_game'])) {
 }
 
 // ============================================
-// DELETE GAME
+// DELETE OPERATIONS
 // ============================================
 if (isset($_GET['delete_game'])) {
     $game_to_delete = $_GET['delete_game'];
@@ -425,6 +357,78 @@ if (isset($_GET['delete_game'])) {
         $_SESSION['error'] = "❌ Error deleting game!";
     }
     header('Location: admin-dashboard.php');
+    exit();
+}
+
+if (isset($_GET['delete_chart'])) {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM chart_data WHERE game_name = ? AND date = ? AND table_type = ?");
+        $stmt->execute([$_GET['delete_chart'], $_GET['chart_date'], $_GET['chart_table_type']]);
+        $_SESSION['success'] = "🗑️ Chart data deleted successfully!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to delete chart data!";
+    }
+    header('Location: admin-dashboard.php?tab=chart');
+    exit();
+}
+
+if (isset($_GET['delete_timing'])) {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_timings WHERE id = ?");
+        $stmt->execute([$_GET['delete_timing']]);
+        $_SESSION['success'] = "🗑️ Game timing deleted!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to delete timing!";
+    }
+    header('Location: admin-dashboard.php?tab=timings');
+    exit();
+}
+
+if (isset($_GET['delete_rate'])) {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_rates WHERE id = ?");
+        $stmt->execute([$_GET['delete_rate']]);
+        $_SESSION['success'] = "🗑️ Game rate deleted!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to delete rate!";
+    }
+    header('Location: admin-dashboard.php?tab=rates');
+    exit();
+}
+
+if (isset($_GET['delete_multiple_result'])) {
+    try {
+        $stmt = $pdo->prepare("DELETE FROM game_multiple_results WHERE id = ?");
+        $stmt->execute([$_GET['delete_multiple_result']]);
+        $_SESSION['success'] = "🗑️ Result deleted!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to delete result!";
+    }
+    header('Location: admin-dashboard.php?tab=multiple');
+    exit();
+}
+
+if (isset($_GET['toggle_timing'])) {
+    try {
+        $stmt = $pdo->prepare("UPDATE game_timings SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
+        $stmt->execute([$_GET['toggle_timing']]);
+        $_SESSION['success'] = "✅ Timing status toggled!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to toggle timing!";
+    }
+    header('Location: admin-dashboard.php?tab=timings');
+    exit();
+}
+
+if (isset($_GET['toggle_rate'])) {
+    try {
+        $stmt = $pdo->prepare("UPDATE game_rates SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?");
+        $stmt->execute([$_GET['toggle_rate']]);
+        $_SESSION['success'] = "✅ Rate status toggled!";
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "❌ Failed to toggle rate!";
+    }
+    header('Location: admin-dashboard.php?tab=rates');
     exit();
 }
 
@@ -480,6 +484,7 @@ $current_tab = $_GET['tab'] ?? 'games';
 $edit_game = $_GET['edit_game'] ?? '';
 $edit_date = $_GET['edit_date'] ?? '';
 $edit_result = $_GET['edit_result'] ?? '';
+$edit_table = $_GET['edit_table'] ?? 'table1';
 $selected_game = $_GET['game'] ?? '';
 $selected_month = $_GET['month'] ?? date('m');
 $selected_year = $_GET['year'] ?? date('Y');
@@ -487,9 +492,8 @@ $selected_year = $_GET['year'] ?? date('Y');
 // ============================================
 // FETCH DATA
 // ============================================
-// Fetch Disawar data
 try {
-    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = 'disawar' AND status = 1");
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = 'disawar'");
     $stmt->execute();
     $disawer = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -498,9 +502,8 @@ try {
 $disawer_result = $disawer['today_result'] ?? '86';
 $disawer_yesterday = $disawer['yesterday_result'] ?? '05';
 
-// Fetch all games
 try {
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 ORDER BY table_type, id");
+    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 'active' ORDER BY table_type, game_name");
     $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $table1_games = [];
@@ -558,7 +561,7 @@ try {
 }
 
 try {
-    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
+    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 'active' ORDER BY game_name");
     $game_names_list = $stmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {
     $game_names_list = array_merge($table1_games, $table2_games);
@@ -568,10 +571,20 @@ $chart1_games = array_merge($table1_games, ['disawar']);
 $chart2_games = $table2_games;
 $chart_data_display = $all_chart_data;
 
-require_once 'header.php';
+// ============================================
+// INCLUDE HEADER
+// ============================================
+require_once '../header.php';
 ?>
 
-<link rel="stylesheet" href="./css/admin-dashboard.css">
+<!-- ============================================ -->
+<!-- INCLUDE CSS -->
+<!-- ============================================ -->
+<link rel="stylesheet" href="../css/admin-dashboard.css">
+
+<!-- ============================================ -->
+<!-- ADMIN DASHBOARD HTML -->
+<!-- ============================================ -->
 <div class="admin-container">
     <!-- Admin Header -->
     <div class="admin-header">
@@ -631,95 +644,39 @@ require_once 'header.php';
 
     <!-- ==================== TAB 1: GAMES ==================== -->
     <div id="tab-games" class="tab-content <?php echo $current_tab === 'games' ? 'active' : ''; ?>">
-
-        <!-- ===== EDIT ANY GAME RESULT (DYNAMIC) ===== -->
-        <div class="admin-section" style="border-left-color: #28a745;">
-            <h2>✏️ Edit Game Result (Any Game)</h2>
-            <form method="POST" class="admin-form" id="editGameForm">
-                <input type="hidden" name="update_result" value="1">
-
-                <div class="form-group">
-                    <label>Select Game:</label>
-                    <select name="game_name" id="selectGameName" required onchange="loadGameData(this.value)">
-                        <option value="">-- Select Game --</option>
-                        <?php
-                        $all_games_list = getGameNames($pdo);
-                        foreach ($all_games_list as $game):
-                            $display = getGameDisplayName($pdo, $game);
-                            ?>
-                            <option value="<?php echo htmlspecialchars($game); ?>">
-                                <?php echo htmlspecialchars(strtoupper($display)); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Display Name:</label>
-                    <input type="text" name="display_name" id="editDisplayName" required placeholder="e.g. DELHI BAZAR">
-                </div>
-
-                <div class="form-group">
-                    <label>Result Time:</label>
-                    <input type="text" name="result_time" id="editResultTime" placeholder="e.g. 5:15 PM">
-                </div>
-
-                <div class="form-group">
-                    <label>Yesterday Result:</label>
-                    <input type="text" name="yesterday_result" id="editYesterdayResult" placeholder="--">
-                    <small style="color: #888; font-size: 11px;">Leave empty to auto-move current today to
-                        yesterday</small>
-                </div>
-
-                <div class="form-group">
-                    <label>Today Result:</label>
-                    <input type="text" name="today_result" id="editTodayResult" placeholder="Enter new result number">
-                    <small style="color: #28a745; font-size: 12px; display: block; margin-top: 5px;">
-                        💡 This will update the selected game's result. Old today result moves to yesterday.
-                    </small>
-                </div>
-
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">💾 Update Result</button>
-                    <button type="button" class="btn-secondary" onclick="clearForm()">🔄 Clear</button>
-                </div>
+        <!-- Edit Disawer -->
+        <div class="admin-section">
+            <h2>✏️ Edit Disawar Result</h2>
+            <form method="POST" class="admin-form">
+                <input type="hidden" name="update_disawer" value="1">
+                <div class="form-group"><label>Display Name:</label><input type="text" name="disawer_display_name"
+                        value="<?php echo htmlspecialchars($disawer['display_name'] ?? 'DISAWAR'); ?>"></div>
+                <div class="form-group"><label>Time:</label><input type="text" name="disawer_time"
+                        value="<?php echo htmlspecialchars($disawer['result_time'] ?? '5:15 AM'); ?>"></div>
+                <div class="form-group"><label>Yesterday Result:</label><input type="text" name="disawer_yesterday"
+                        value="<?php echo htmlspecialchars($disawer_yesterday); ?>"></div>
+                <div class="form-group"><label>Today Result:</label><input type="text" name="disawer_today"
+                        value="<?php echo htmlspecialchars($disawer_result); ?>"></div>
+                <button type="submit" class="btn-primary">💾 Update Result</button>
             </form>
-
-            <div id="gameInfoDisplay"
-                style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;">
-                <p style="margin: 0; font-size: 14px; color: #333;">
-                    <strong>Current Status:</strong>
-                    <span id="currentStatus">Select a game to view details</span>
-                </p>
-            </div>
         </div>
 
-        <!-- ===== ADD NEW GAME ===== -->
+        <!-- Add New Game -->
         <div class="admin-section">
             <h2>➕ Add New Game</h2>
             <form method="POST" class="admin-form">
                 <input type="hidden" name="add_game" value="1">
-                <div class="form-group">
-                    <label>Game Name (slug):</label>
-                    <input type="text" name="new_game_name" placeholder="e.g. new-game" required>
-                </div>
-                <div class="form-group">
-                    <label>Display Name:</label>
-                    <input type="text" name="new_display_name" placeholder="सट्टा का नाम">
-                </div>
-                <div class="form-group">
-                    <label>Yesterday:</label>
-                    <input type="text" name="new_yesterday_result" placeholder="--">
-                </div>
-                <div class="form-group">
-                    <label>Today:</label>
-                    <input type="text" name="new_today_result" placeholder="WAIT">
-                </div>
-                <div class="form-group">
-                    <label>Time:</label>
-                    <input type="text" name="new_result_time" placeholder="5:15 PM">
-                </div>
-                <div class="form-group">
-                    <label>Table:</label>
+                <div class="form-group"><label>Game Name (slug):</label><input type="text" name="new_game_name"
+                        placeholder="e.g. new-game" required></div>
+                <div class="form-group"><label>Display Name:</label><input type="text" name="new_display_name"
+                        placeholder="सट्टा का नाम"></div>
+                <div class="form-group"><label>Yesterday:</label><input type="text" name="new_yesterday_result"
+                        placeholder="--"></div>
+                <div class="form-group"><label>Today:</label><input type="text" name="new_today_result"
+                        placeholder="WAIT"></div>
+                <div class="form-group"><label>Time:</label><input type="text" name="new_result_time"
+                        placeholder="5:15 PM"></div>
+                <div class="form-group"><label>Table:</label>
                     <select name="new_table_type">
                         <option value="table1">Table 1</option>
                         <option value="table2">Table 2</option>
@@ -741,15 +698,12 @@ require_once 'header.php';
                             <th>Yesterday</th>
                             <th>Today</th>
                             <th>Time</th>
-                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($table1_games as $game):
-                            $data = isset($all_games[$game]) ? $all_games[$game] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game, 'status' => 1];
-                            $status_text = ($data['status'] == 1) ? '✅ Active' : '❌ Inactive';
-                            $status_color = ($data['status'] == 1) ? '#28a745' : '#dc3545';
+                            $data = isset($all_games[$game]) ? $all_games[$game] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
                             ?>
                             <tr>
                                 <td class="game-name-cell"><?php echo ucfirst($game); ?></td>
@@ -757,15 +711,11 @@ require_once 'header.php';
                                 <td><?php echo $data['yesterday_result']; ?></td>
                                 <td><?php echo $data['today_result']; ?></td>
                                 <td><?php echo $data['result_time']; ?></td>
-                                <td><span style="color: <?php echo $status_color; ?>;"><?php echo $status_text; ?></span>
-                                </td>
                                 <td>
                                     <div class="actions-cell">
                                         <button class="btn-edit"
                                             onclick="openEditModal('<?php echo $game; ?>', '<?php echo $data['yesterday_result']; ?>', '<?php echo $data['today_result']; ?>', '<?php echo $data['result_time']; ?>', '<?php echo $data['display_name']; ?>')">✏️
                                             Edit</button>
-                                        <a href="?toggle_game=<?php echo urlencode($game); ?>" class="btn-toggle">🔄
-                                            Toggle</a>
                                         <a href="?delete_game=<?php echo urlencode($game); ?>" class="btn-delete"
                                             onclick="return confirm('Delete game \'<?php echo ucfirst($game); ?>\'?')">🗑️
                                             Delete</a>
@@ -790,15 +740,12 @@ require_once 'header.php';
                             <th>Yesterday</th>
                             <th>Today</th>
                             <th>Time</th>
-                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($table2_games as $game):
-                            $data = isset($all_games[$game]) ? $all_games[$game] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game, 'status' => 1];
-                            $status_text = ($data['status'] == 1) ? '✅ Active' : '❌ Inactive';
-                            $status_color = ($data['status'] == 1) ? '#28a745' : '#dc3545';
+                            $data = isset($all_games[$game]) ? $all_games[$game] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
                             ?>
                             <tr>
                                 <td class="game-name-cell"><?php echo ucfirst($game); ?></td>
@@ -806,15 +753,11 @@ require_once 'header.php';
                                 <td><?php echo $data['yesterday_result']; ?></td>
                                 <td><?php echo $data['today_result']; ?></td>
                                 <td><?php echo $data['result_time']; ?></td>
-                                <td><span style="color: <?php echo $status_color; ?>;"><?php echo $status_text; ?></span>
-                                </td>
                                 <td>
                                     <div class="actions-cell">
                                         <button class="btn-edit"
                                             onclick="openEditModal('<?php echo $game; ?>', '<?php echo $data['yesterday_result']; ?>', '<?php echo $data['today_result']; ?>', '<?php echo $data['result_time']; ?>', '<?php echo $data['display_name']; ?>')">✏️
                                             Edit</button>
-                                        <a href="?toggle_game=<?php echo urlencode($game); ?>" class="btn-toggle">🔄
-                                            Toggle</a>
                                         <a href="?delete_game=<?php echo urlencode($game); ?>" class="btn-delete"
                                             onclick="return confirm('Delete game \'<?php echo ucfirst($game); ?>\'?')">🗑️
                                             Delete</a>
@@ -837,6 +780,7 @@ require_once 'header.php';
                     <input type="hidden" name="update_chart" value="1">
                     <input type="hidden" name="chart_game" value="<?php echo $edit_game; ?>">
                     <input type="hidden" name="chart_date" value="<?php echo $edit_date; ?>">
+                    <input type="hidden" name="chart_table_type" value="<?php echo $edit_table; ?>">
                     <div class="form-group"><label>Game:</label><input type="text"
                             value="<?php echo ucfirst($edit_game); ?>" disabled></div>
                     <div class="form-group"><label>Date:</label><input type="text" value="<?php echo $edit_date; ?>"
@@ -862,10 +806,16 @@ require_once 'header.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group"><label>Date (YYYY-MM-DD):</label><input type="date" name="chart_date" required>
-                </div>
+                <div class="form-group"><label>Date (DD-MM):</label><input type="text" name="chart_date"
+                        placeholder="e.g. 01-06" required></div>
                 <div class="form-group"><label>Result Number:</label><input type="text" name="chart_result"
                         placeholder="Enter result number" required></div>
+                <div class="form-group"><label>Table Type:</label>
+                    <select name="chart_table_type" required>
+                        <option value="table1">Table 1</option>
+                        <option value="table2">Table 2</option>
+                    </select>
+                </div>
                 <button type="submit" class="btn-success">💾 Save Chart Data</button>
             </form>
         </div>
@@ -920,13 +870,14 @@ require_once 'header.php';
                             <th>Game Name</th>
                             <th>Date</th>
                             <th>Result</th>
+                            <th>Table</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($chart_data_display)): ?>
                             <tr>
-                                <td colspan="5" style="padding:30px; text-align:center; color:#999;">No chart data found.
+                                <td colspan="6" style="padding:30px; text-align:center; color:#999;">No chart data found.
                                 </td>
                             </tr>
                         <?php else:
@@ -934,14 +885,17 @@ require_once 'header.php';
                                 <tr>
                                     <td><?php echo $row['id']; ?></td>
                                     <td><strong><?php echo ucfirst($row['game_name']); ?></strong></td>
-                                    <td><?php echo $row['chart_date']; ?></td>
+                                    <td><?php echo $row['date']; ?></td>
                                     <td style="font-weight:bold; color:#c49a00; font-size:18px;">
-                                        <?php echo $row['result'] ?: '--'; ?></td>
+                                        <?php echo $row['result_number'] ?: '--'; ?></td>
+                                    <td><span
+                                            style="background: <?php echo $row['table_type'] === 'table1' ? '#ffd700' : '#17a2b8'; ?>; color:#000; padding:2px 10px; border-radius:10px; font-size:11px;"><?php echo $row['table_type']; ?></span>
+                                    </td>
                                     <td>
                                         <div class="actions-cell">
-                                            <a href="admin-dashboard.php?tab=chart&edit_game=<?php echo urlencode($row['game_name']); ?>&edit_date=<?php echo urlencode($row['chart_date']); ?>&edit_result=<?php echo urlencode($row['result']); ?>"
+                                            <a href="admin-dashboard.php?tab=chart&edit_game=<?php echo urlencode($row['game_name']); ?>&edit_date=<?php echo urlencode($row['date']); ?>&edit_result=<?php echo urlencode($row['result_number']); ?>&edit_table=<?php echo urlencode($row['table_type']); ?>"
                                                 class="btn-edit">✏️ Edit</a>
-                                            <a href="?delete_chart=<?php echo urlencode($row['game_name']); ?>&chart_date=<?php echo urlencode($row['chart_date']); ?>"
+                                            <a href="?delete_chart=<?php echo urlencode($row['game_name']); ?>&chart_date=<?php echo urlencode($row['date']); ?>&chart_table_type=<?php echo urlencode($row['table_type']); ?>"
                                                 class="btn-delete" onclick="return confirm('Delete this entry?')">🗑️ Delete</a>
                                         </div>
                                     </td>
@@ -1153,7 +1107,7 @@ require_once 'header.php';
                     <select name="featured_game" required>
                         <option value="disawar" <?php echo (getWebsiteContent($pdo, 'featured_game') == 'disawar') ? 'selected' : ''; ?>>DISAWAR</option>
                         <?php
-                        $stmt = $pdo->query("SELECT game_name, display_name FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 ORDER BY game_name");
+                        $stmt = $pdo->query("SELECT game_name, display_name FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 'active' ORDER BY game_name");
                         $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         foreach ($games as $game):
                             $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
@@ -1255,10 +1209,21 @@ require_once 'header.php';
             <div class="form-group"><label>Game Name:</label><input type="text" id="editGameNameDisplay" disabled></div>
             <div class="form-group"><label>Display Name:</label><input type="text" name="display_name"
                     id="editDisplayName" required></div>
-            <div class="form-group"><label>Yesterday Result:</label><input type="text" name="yesterday_result"
-                    id="editYesterday" placeholder="--"></div>
-            <div class="form-group"><label>Today Result:</label><input type="text" name="today_result" id="editToday"
-                    placeholder="Enter new result number" required></div>
+            <div class="form-group current-status">
+                <label>Current Status:</label>
+                <div class="status-display">
+                    <div><small>Yesterday</small>
+                        <div id="editYesterdayDisplay">--</div>
+                    </div>
+                    <div><small>Today</small>
+                        <div id="editTodayDisplay">WAIT</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group"><label>New Result:</label><input type="text" name="today_result" id="editToday"
+                    placeholder="Enter new result number" required>
+                <small>💡 This will replace 'WAIT' with the new result.</small>
+            </div>
             <div class="form-group"><label>Result Time:</label><input type="text" name="result_time" id="editTime"
                     placeholder="e.g. 5:15 PM"></div>
             <div class="modal-actions">
@@ -1344,150 +1309,8 @@ require_once 'header.php';
 </div>
 
 <!-- ============================================ -->
-<!-- JAVASCRIPT -->
+<!-- INCLUDE JAVASCRIPT -->
 <!-- ============================================ -->
-<script>
-    // ===== EDIT GAME MODAL =====
-    function openEditModal(game, yesterday, today, time, displayName) {
-        document.getElementById('editGameName').value = game;
-        document.getElementById('editGameNameDisplay').value = game.toUpperCase();
-        document.getElementById('editDisplayName').value = displayName || '';
-        document.getElementById('editYesterday').value = yesterday || '--';
-        document.getElementById('editToday').value = today || 'WAIT';
-        document.getElementById('editTime').value = time;
-        document.getElementById('editModal').style.display = 'flex';
-    }
-
-    function closeEditModal() {
-        document.getElementById('editModal').style.display = 'none';
-    }
-
-    // ===== DYNAMIC GAME SELECTOR =====
-    function loadGameData(gameName) {
-        if (!gameName) {
-            document.getElementById('gameInfoDisplay').style.display = 'none';
-            return;
-        }
-
-        document.getElementById('gameInfoDisplay').style.display = 'block';
-        document.getElementById('currentStatus').innerHTML = '⏳ Loading...';
-
-        fetch('ajax-get-game-info.php?game=' + encodeURIComponent(gameName))
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('editDisplayName').value = data.display_name || '';
-                    document.getElementById('editResultTime').value = data.result_time || '';
-                    document.getElementById('editYesterdayResult').value = data.yesterday_result || '--';
-                    document.getElementById('editTodayResult').value = data.today_result || 'WAIT';
-
-                    document.getElementById('currentStatus').innerHTML =
-                        '📊 <strong>Today:</strong> ' + (data.today_result || 'WAIT') +
-                        ' | <strong>Yesterday:</strong> ' + (data.yesterday_result || '--') +
-                        ' | <strong>Time:</strong> ' + (data.result_time || '--');
-                } else {
-                    document.getElementById('currentStatus').innerHTML = '⚠️ Game not found or inactive';
-                }
-            })
-            .catch(error => {
-                console.log('Error loading game data:', error);
-                document.getElementById('currentStatus').innerHTML = '❌ Error loading game data';
-            });
-    }
-
-    function clearForm() {
-        document.getElementById('selectGameName').value = '';
-        document.getElementById('editDisplayName').value = '';
-        document.getElementById('editResultTime').value = '';
-        document.getElementById('editYesterdayResult').value = '';
-        document.getElementById('editTodayResult').value = '';
-        document.getElementById('gameInfoDisplay').style.display = 'none';
-    }
-
-    // ===== TIMING EDIT MODAL =====
-    function openTimingEditModal(id, gameName, timing, emoji, isActive) {
-        document.getElementById('timingEditId').value = id;
-        document.getElementById('timingEditGameName').value = gameName;
-        document.getElementById('timingEditTime').value = timing;
-        document.getElementById('timingEditEmoji').value = emoji;
-        document.getElementById('timingEditActive').value = isActive;
-        document.getElementById('timingEditModal').style.display = 'flex';
-    }
-
-    function closeTimingEditModal() {
-        document.getElementById('timingEditModal').style.display = 'none';
-    }
-
-    // ===== RATE EDIT MODAL =====
-    function openRateEditModal(id, rateType, rateValue, isActive) {
-        document.getElementById('rateEditId').value = id;
-        document.getElementById('rateEditType').value = rateType;
-        document.getElementById('rateEditValue').value = rateValue;
-        document.getElementById('rateEditActive').value = isActive;
-        document.getElementById('rateEditModal').style.display = 'flex';
-    }
-
-    function closeRateEditModal() {
-        document.getElementById('rateEditModal').style.display = 'none';
-    }
-
-    // ===== MULTIPLE RESULT EDIT MODAL =====
-    function openMultipleResultEditModal(id, gameName, date, number, time) {
-        document.getElementById('mrEditId').value = id;
-        document.getElementById('mrEditGameName').value = gameName;
-        document.getElementById('mrEditDate').value = date;
-        document.getElementById('mrEditNumber').value = number;
-        document.getElementById('mrEditTime').value = time || '';
-        document.getElementById('multipleResultEditModal').style.display = 'flex';
-    }
-
-    function closeMultipleResultEditModal() {
-        document.getElementById('multipleResultEditModal').style.display = 'none';
-    }
-
-    // ===== AUTO-LOAD ON PAGE LOAD =====
-    document.addEventListener('DOMContentLoaded', function () {
-        const select = document.getElementById('selectGameName');
-        if (select && select.value) {
-            loadGameData(select.value);
-        }
-    });
-
-    // ===== CLOSE MODALS ON CLICK OUTSIDE =====
-    window.onclick = function (event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-        }
-    }
-
-    // ===== CLOSE MODALS WITH ESCAPE KEY =====
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') {
-            document.querySelectorAll('.modal').forEach(function (el) {
-                el.style.display = 'none';
-            });
-        }
-    });
-</script>
-
-<style>
-    .btn-secondary {
-        background: #6c757d;
-        color: #fff;
-        padding: 10px 30px;
-        border: none;
-        border-radius: 30px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: transform 0.2s, opacity 0.2s;
-        font-size: 14px;
-        white-space: nowrap;
-    }
-
-    .btn-secondary:hover {
-        background: #5a6268;
-        transform: scale(1.03);
-    }
-</style>
+<script src="./js/admin-dashboard.js"></script>
 
 <?php require_once 'footer.php'; ?>

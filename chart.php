@@ -21,7 +21,7 @@ $next_month = date('Y-m', strtotime($month . '-01 +1 month'));
 
 // Fetch all games dynamically from database
 try {
-    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 'active' ORDER BY table_type, id");
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 1 ORDER BY table_type, id");
     $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $table1_games = [];
@@ -38,109 +38,73 @@ try {
     // Fallback if empty
     if (empty($table1_games)) {
         $table1_games = [
-            ['game_name' => 'disawer', 'display_name' => 'DISAWER'],
+            ['game_name' => 'disawar', 'display_name' => 'DISAWAR'],
             ['game_name' => 'sadar bazar', 'display_name' => 'SADAR BAZAR'],
             ['game_name' => 'gwalior', 'display_name' => 'GWALIOR'],
             ['game_name' => 'delhi bazar', 'display_name' => 'DELHI BAZAR'],
-            ['game_name' => 'delhi matka', 'display_name' => 'DELHI MATKA'],
             ['game_name' => 'shri ganesh', 'display_name' => 'SHRI GANESH'],
-            ['game_name' => 'agra', 'display_name' => 'AGRA'],
             ['game_name' => 'faridabad', 'display_name' => 'FARIDABAD'],
-            ['game_name' => 'alwar', 'display_name' => 'ALWAR'],
             ['game_name' => 'gaziabad', 'display_name' => 'GAZIABAD'],
-            ['game_name' => 'dwarka', 'display_name' => 'DWARKA'],
             ['game_name' => 'gali', 'display_name' => 'GALI']
         ];
     }
 
     if (empty($table2_games)) {
         $table2_games = [
-            ['game_name' => 'hr satta', 'display_name' => 'HR SATTA'],
-            ['game_name' => 'kkr city', 'display_name' => 'KKR CITY'],
-            ['game_name' => 'madhupuri', 'display_name' => 'MADHUPURI'],
-            ['game_name' => 'ujjala super', 'display_name' => 'UJJALA SUPER'],
-            ['game_name' => 'karol bagh', 'display_name' => 'KAROL BAGH'],
-            ['game_name' => 'anmol bazar', 'display_name' => 'ANMOL BAZAR'],
-            ['game_name' => 'sky king', 'display_name' => 'SKY KING'],
-            ['game_name' => 'delhi darbar', 'display_name' => 'DELHI DARBAR'],
-            ['game_name' => 'new ganga', 'display_name' => 'NEW GANGA'],
-            ['game_name' => 'fatehabad', 'display_name' => 'FATEHABAD'],
-            ['game_name' => 'raj shree', 'display_name' => 'RAJ SHREE'],
             ['game_name' => 'mandi bazar', 'display_name' => 'MANDI BAZAR'],
             ['game_name' => 'bhadra bazar', 'display_name' => 'BHADRA BAZAR'],
             ['game_name' => 'sialkot', 'display_name' => 'SIALKOT'],
             ['game_name' => 'lion bazar', 'display_name' => 'LION BAZAR'],
             ['game_name' => 'gaziabad king', 'display_name' => 'GAZIABAD KING'],
             ['game_name' => 'dehradun city', 'display_name' => 'DEHRADUN CITY'],
-            ['game_name' => 'daman', 'display_name' => 'DAMAN']
+            ['game_name' => 'daman', 'display_name' => 'DAMAN'],
+            ['game_name' => 'pushkar', 'display_name' => 'PUSHKAR']
         ];
     }
 } catch (PDOException $e) {
     $table1_games = [
-        ['game_name' => 'disawer', 'display_name' => 'DISAWER'],
+        ['game_name' => 'disawar', 'display_name' => 'DISAWAR'],
         ['game_name' => 'sadar bazar', 'display_name' => 'SADAR BAZAR'],
         ['game_name' => 'gwalior', 'display_name' => 'GWALIOR'],
         ['game_name' => 'delhi bazar', 'display_name' => 'DELHI BAZAR'],
-        ['game_name' => 'delhi matka', 'display_name' => 'DELHI MATKA'],
         ['game_name' => 'shri ganesh', 'display_name' => 'SHRI GANESH'],
-        ['game_name' => 'agra', 'display_name' => 'AGRA'],
         ['game_name' => 'faridabad', 'display_name' => 'FARIDABAD'],
-        ['game_name' => 'alwar', 'display_name' => 'ALWAR'],
         ['game_name' => 'gaziabad', 'display_name' => 'GAZIABAD'],
-        ['game_name' => 'dwarka', 'display_name' => 'DWARKA'],
         ['game_name' => 'gali', 'display_name' => 'GALI']
     ];
     $table2_games = [
-        ['game_name' => 'hr satta', 'display_name' => 'HR SATTA'],
-        ['game_name' => 'kkr city', 'display_name' => 'KKR CITY'],
-        ['game_name' => 'madhupuri', 'display_name' => 'MADHUPURI'],
-        ['game_name' => 'ujjala super', 'display_name' => 'UJJALA SUPER'],
-        ['game_name' => 'karol bagh', 'display_name' => 'KAROL BAGH'],
-        ['game_name' => 'anmol bazar', 'display_name' => 'ANMOL BAZAR'],
-        ['game_name' => 'sky king', 'display_name' => 'SKY KING'],
-        ['game_name' => 'delhi darbar', 'display_name' => 'DELHI DARBAR'],
-        ['game_name' => 'new ganga', 'display_name' => 'NEW GANGA'],
-        ['game_name' => 'fatehabad', 'display_name' => 'FATEHABAD'],
-        ['game_name' => 'raj shree', 'display_name' => 'RAJ SHREE'],
         ['game_name' => 'mandi bazar', 'display_name' => 'MANDI BAZAR'],
         ['game_name' => 'bhadra bazar', 'display_name' => 'BHADRA BAZAR'],
         ['game_name' => 'sialkot', 'display_name' => 'SIALKOT'],
         ['game_name' => 'lion bazar', 'display_name' => 'LION BAZAR'],
         ['game_name' => 'gaziabad king', 'display_name' => 'GAZIABAD KING'],
         ['game_name' => 'dehradun city', 'display_name' => 'DEHRADUN CITY'],
-        ['game_name' => 'daman', 'display_name' => 'DAMAN']
+        ['game_name' => 'daman', 'display_name' => 'DAMAN'],
+        ['game_name' => 'pushkar', 'display_name' => 'PUSHKAR']
     ];
 }
 
-// Generate all dates for the month
+// Generate all dates for the month (YYYY-MM-DD format)
 $all_dates = [];
 for ($day = 1; $day <= $days_in_month; $day++) {
-    $date_str = str_pad($day, 2, '0', STR_PAD_LEFT) . '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT);
+    $date_str = $year . '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT) . '-' . str_pad($day, 2, '0', STR_PAD_LEFT);
     $all_dates[] = $date_str;
 }
 
-// Fetch all chart data for this month
+// Fetch all chart data for this month using new schema
 try {
-    $stmt = $pdo->prepare("SELECT * FROM chart_data WHERE date LIKE ? ORDER BY date ASC");
-    $stmt->execute([$day_prefix = substr($month, 5, 2) . '-' !== false ? '%-' . substr($month, 5, 2) : '%']);
+    // Get all data for this month
+    $start_date = $year . '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT) . '-01';
+    $end_date = $year . '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT) . '-' . $days_in_month;
 
-    // Better approach - get all data and filter by month
-    $stmt = $pdo->query("SELECT * FROM chart_data ORDER BY date ASC");
-    $all_chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Filter for current month
-    $chart_data = [];
-    $month_pattern = '-' . str_pad($month_num, 2, '0', STR_PAD_LEFT);
-    foreach ($all_chart_data as $row) {
-        if (strpos($row['date'], $month_pattern) !== false) {
-            $chart_data[] = $row;
-        }
-    }
+    $stmt = $pdo->prepare("SELECT * FROM chart_data WHERE chart_date BETWEEN ? AND ? ORDER BY chart_date ASC");
+    $stmt->execute([$start_date, $end_date]);
+    $chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Get unique dates that have data
     $dates_with_data = [];
     foreach ($chart_data as $row) {
-        $dates_with_data[$row['date']] = true;
+        $dates_with_data[$row['chart_date']] = true;
     }
     $dates_with_data = array_keys($dates_with_data);
     sort($dates_with_data);
@@ -151,23 +115,23 @@ try {
     $db_error = $e->getMessage();
 }
 
-// Build lookup array: [date][game_name] = result_number
+// Build lookup array: [date][game_name] = result
 $data_lookup = [];
 foreach ($chart_data as $row) {
-    $data_lookup[$row['date']][$row['game_name']] = $row['result_number'];
+    $data_lookup[$row['chart_date']][$row['game_name']] = $row['result'];
 }
 
 // Get disawer display info
 try {
-    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = 'disawer'");
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = 'disawar'");
     $stmt->execute();
     $disawer_info = $stmt->fetch(PDO::FETCH_ASSOC);
-    $disawer_display = $disawer_info['display_name'] ?? 'DISAWER';
+    $disawer_display = $disawer_info['display_name'] ?? 'DISAWAR';
     $disawer_today = $disawer_info['today_result'] ?? '--';
     $disawer_yesterday = $disawer_info['yesterday_result'] ?? '--';
     $disawer_time = $disawer_info['result_time'] ?? '5:15 AM';
 } catch (PDOException $e) {
-    $disawer_display = 'DISAWER';
+    $disawer_display = 'DISAWAR';
     $disawer_today = '--';
     $disawer_yesterday = '--';
     $disawer_time = '5:15 AM';
@@ -176,6 +140,7 @@ try {
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -498,6 +463,7 @@ try {
         }
     </style>
 </head>
+
 <body>
 
     <div class="chart-main-container">
@@ -513,17 +479,10 @@ try {
         </div>
 
         <?php if (isset($db_error)): ?>
-                <div class="db-error">
-                    ⚠️ Database Notice: <?php echo htmlspecialchars($db_error); ?>
-                </div>
+            <div class="db-error">
+                ⚠️ Database Notice: <?php echo htmlspecialchars($db_error); ?>
+            </div>
         <?php endif; ?>
-
-        <!-- Disawer Section -->
-        <div class="chart-disawer-section">
-            <div class="disawer-title"><?php echo htmlspecialchars(strtoupper($disawer_display)); ?></div>
-            <div class="disawer-time"><?php echo htmlspecialchars($disawer_time); ?></div>
-            <div class="disawer-arrow"><?php echo htmlspecialchars($disawer_yesterday); ?> ➡️ <?php echo htmlspecialchars($disawer_today); ?></div>
-        </div>
 
         <!-- TABLE 1 - Main Games Chart -->
         <div class="section-title">📋 MAIN GAMES CHART</div>
@@ -533,32 +492,37 @@ try {
                     <tr>
                         <th>DATE</th>
                         <?php foreach ($table1_games as $game): ?>
-                                <th><?php echo htmlspecialchars(strtoupper($game['display_name'] ?? $game['game_name'])); ?></th>
+                            <th><?php echo htmlspecialchars(strtoupper($game['display_name'] ?? $game['game_name'])); ?>
+                            </th>
                         <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($all_dates)): ?>
-                            <?php foreach ($all_dates as $date_str): ?>
-                                    <tr>
-                                        <td class="date-col"><strong><?php echo $date_str; ?></strong></td>
-                                        <?php foreach ($table1_games as $game):
-                                            $result = $data_lookup[$date_str][$game['game_name']] ?? null;
-                                            ?>
-                                                <td>
-                                                    <span class="chart-number-box <?php echo !$result ? 'empty' : ''; ?>">
-                                                        <?php echo $result ? htmlspecialchars($result) : '--'; ?>
-                                                    </span>
-                                                </td>
-                                        <?php endforeach; ?>
-                                    </tr>
-                            <?php endforeach; ?>
-                    <?php else: ?>
+                        <?php foreach ($all_dates as $date_str):
+                            // Format date for display (DD-MM)
+                            $date_parts = explode('-', $date_str);
+                            $display_date = $date_parts[2] . '-' . $date_parts[1];
+                            ?>
                             <tr>
-                                <td colspan="<?php echo count($table1_games) + 1; ?>" class="no-data">
-                                    📭 No chart data available for <?php echo $month_name; ?>.
-                                </td>
+                                <td class="date-col"><strong><?php echo $display_date; ?></strong></td>
+                                <?php foreach ($table1_games as $game):
+                                    $result = $data_lookup[$date_str][$game['game_name']] ?? null;
+                                    ?>
+                                    <td>
+                                        <span class="chart-number-box <?php echo !$result ? 'empty' : ''; ?>">
+                                            <?php echo $result ? htmlspecialchars($result) : '--'; ?>
+                                        </span>
+                                    </td>
+                                <?php endforeach; ?>
                             </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="<?php echo count($table1_games) + 1; ?>" class="no-data">
+                                📭 No chart data available for <?php echo $month_name; ?>.
+                            </td>
+                        </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -572,32 +536,37 @@ try {
                     <tr>
                         <th>DATE</th>
                         <?php foreach ($table2_games as $game): ?>
-                                <th><?php echo htmlspecialchars(strtoupper($game['display_name'] ?? $game['game_name'])); ?></th>
+                            <th><?php echo htmlspecialchars(strtoupper($game['display_name'] ?? $game['game_name'])); ?>
+                            </th>
                         <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($all_dates)): ?>
-                            <?php foreach ($all_dates as $date_str): ?>
-                                    <tr>
-                                        <td class="date-col"><strong><?php echo $date_str; ?></strong></td>
-                                        <?php foreach ($table2_games as $game):
-                                            $result = $data_lookup[$date_str][$game['game_name']] ?? null;
-                                            ?>
-                                                <td>
-                                                    <span class="chart-number-box <?php echo !$result ? 'empty' : ''; ?>">
-                                                        <?php echo $result ? htmlspecialchars($result) : '--'; ?>
-                                                    </span>
-                                                </td>
-                                        <?php endforeach; ?>
-                                    </tr>
-                            <?php endforeach; ?>
-                    <?php else: ?>
+                        <?php foreach ($all_dates as $date_str):
+                            // Format date for display (DD-MM)
+                            $date_parts = explode('-', $date_str);
+                            $display_date = $date_parts[2] . '-' . $date_parts[1];
+                            ?>
                             <tr>
-                                <td colspan="<?php echo count($table2_games) + 1; ?>" class="no-data">
-                                    📭 No chart data available for <?php echo $month_name; ?>.
-                                </td>
+                                <td class="date-col"><strong><?php echo $display_date; ?></strong></td>
+                                <?php foreach ($table2_games as $game):
+                                    $result = $data_lookup[$date_str][$game['game_name']] ?? null;
+                                    ?>
+                                    <td>
+                                        <span class="chart-number-box <?php echo !$result ? 'empty' : ''; ?>">
+                                            <?php echo $result ? htmlspecialchars($result) : '--'; ?>
+                                        </span>
+                                    </td>
+                                <?php endforeach; ?>
                             </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="<?php echo count($table2_games) + 1; ?>" class="no-data">
+                                📭 No chart data available for <?php echo $month_name; ?>.
+                            </td>
+                        </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -617,8 +586,12 @@ try {
     </div>
 
     <div class="disclaimer">
-        !! DISCLAIMER - A1 satta live is a non-commercial informational website. Please view this site at your own risk, All The Information Shown On Website Is Sponsored And We Warn You That satta matka Gambling/Satta May Be Banned Or Illegal In Your Country. We Are Not Responsible For Any Issues Or Scam..., We Respect All Country Rules/Laws... If You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
+        !! DISCLAIMER - A1 satta live is a non-commercial informational website. Please view this site at your own risk,
+        All The Information Shown On Website Is Sponsored And We Warn You That satta matka Gambling/Satta May Be Banned
+        Or Illegal In Your Country. We Are Not Responsible For Any Issues Or Scam..., We Respect All Country
+        Rules/Laws... If You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
     </div>
 
 </body>
+
 </html>

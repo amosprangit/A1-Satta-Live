@@ -18,11 +18,11 @@ $game_name = str_replace('-', ' ', $game_slug);
 
 // Fetch game data directly from database
 try {
-    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = LOWER(?)");
+    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = LOWER(?) AND status = 1");
     $stmt->execute([$game_name]);
     $game_result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // If not found, try case-insensitive
+    // If not found, try case-insensitive without status filter
     if (!$game_result) {
         $stmt = $pdo->query("SELECT game_name FROM game_results");
         $all_games = $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -30,7 +30,7 @@ try {
         foreach ($all_games as $db_game) {
             if (strtolower($db_game) === strtolower($game_name)) {
                 $game_name = $db_game;
-                $stmt = $pdo->prepare("SELECT * FROM game_results WHERE game_name = ?");
+                $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = LOWER(?) AND status = 1");
                 $stmt->execute([$game_name]);
                 $game_result = $stmt->fetch(PDO::FETCH_ASSOC);
                 $found = true;
@@ -64,9 +64,61 @@ try {
     $game_timing = $result_time;
 }
 
-// Get all chart data for this game
+// ============ TIMER LOGIC ============
+function shouldShowTodayResult($game_timing)
+{
+    // Get current time
+    $current_time = new DateTime('now', new DateTimeZone('Asia/Kolkata'));
+    $current_hour = (int) $current_time->format('H');
+    $current_minute = (int) $current_time->format('i');
+    $current_minutes = ($current_hour * 60) + $current_minute;
+
+    // Parse game timing
+    $timing_parts = explode(' ', $game_timing);
+    if (count($timing_parts) == 2) {
+        $time_parts = explode(':', $timing_parts[0]);
+        $hour = (int) $time_parts[0];
+        $minute = (int) $time_parts[1];
+        $ampm = strtoupper($timing_parts[1]);
+
+        if ($ampm == 'PM' && $hour != 12) {
+            $hour += 12;
+        } elseif ($ampm == 'AM' && $hour == 12) {
+            $hour = 0;
+        }
+        $timing_minutes = ($hour * 60) + $minute;
+    } else {
+        $time_parts = explode(':', $game_timing);
+        $hour = (int) $time_parts[0];
+        $minute = (int) ($time_parts[1] ?? 0);
+        $timing_minutes = ($hour * 60) + $minute;
+    }
+
+    if (empty($game_timing) || !isset($timing_minutes)) {
+        return true;
+    }
+
+    return $current_minutes >= $timing_minutes;
+}
+
+$show_today_result = shouldShowTodayResult($game_timing);
+
+if (!$show_today_result) {
+    $today_result_value = $current_result;
+    $current_result = 'WAIT';
+}
+
+$current_time = new DateTime('now', new DateTimeZone('Asia/Kolkata'));
+$current_hour = (int) $current_time->format('H');
+$current_minute = (int) $current_time->format('i');
+
+if ($current_hour == 0 && $current_minute <= 5) {
+    $current_result = 'WAIT';
+}
+
+// Get all chart data for this game using new schema
 try {
-    $stmt = $pdo->prepare("SELECT date, result_number FROM chart_data WHERE LOWER(game_name) = LOWER(?) ORDER BY STR_TO_DATE(date, '%d-%m') DESC");
+    $stmt = $pdo->prepare("SELECT chart_date, result FROM chart_data WHERE LOWER(game_name) = LOWER(?) ORDER BY chart_date DESC");
     $stmt->execute([$game_name]);
     $chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -107,6 +159,21 @@ require_once 'header.php';
         margin-top: 5px;
     }
 
+    .game-header-box .countdown-timer {
+        font-size: 14px;
+        color: #ff6b6b;
+        margin-top: 8px;
+        padding: 5px 15px;
+        background: rgba(255, 0, 0, 0.1);
+        border-radius: 20px;
+        display: inline-block;
+    }
+
+    .game-header-box .countdown-timer .time-remaining {
+        font-weight: bold;
+        color: #fff;
+    }
+
     .game-info-card {
         background: #fff;
         border-radius: 15px;
@@ -140,6 +207,26 @@ require_once 'header.php';
     .game-info-item .value.result {
         color: #c49a00;
         font-size: clamp(24px, 5vw, 36px);
+    }
+
+    .game-info-item .value.wait {
+        color: #d32f2f;
+        font-size: clamp(18px, 3vw, 24px);
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.4;
+        }
+
+        100% {
+            opacity: 1;
+        }
     }
 
     .chart-section {
@@ -334,12 +421,130 @@ require_once 'header.php';
     }
 </style>
 
+<script>
+    // JavaScript countdown timer for real-time updates
+    document.addEventListener('DOMContentLoaded', function () {
+        const gameTiming = '<?php echo htmlspecialchars($game_timing); ?>';
+        const gameName = '<?php echo htmlspecialchars($display_name); ?>';
+
+        function parseTime(timingStr) {
+            if (!timingStr) return null;
+
+            let hour, minute, ampm;
+            const parts = timingStr.trim().split(' ');
+
+            if (parts.length === 2) {
+                // Format: "10:30 PM"
+                const timeParts = parts[0].split(':');
+                hour = parseInt(timeParts[0]);
+                minute = parseInt(timeParts[1]);
+                ampm = parts[1].toUpperCase();
+
+                if (ampm === 'PM' && hour !== 12) {
+                    hour += 12;
+                } else if (ampm === 'AM' && hour === 12) {
+                    hour = 0;
+                }
+            } else if (parts.length === 1) {
+                // Format: "22:30"
+                const timeParts = timingStr.split(':');
+                hour = parseInt(timeParts[0]);
+                minute = parseInt(timeParts[1] || 0);
+            } else {
+                return null;
+            }
+
+            return { hour, minute };
+        }
+
+        function updateCountdown() {
+            const now = new Date();
+            let targetTime = parseTime(gameTiming);
+
+            if (!targetTime) {
+                document.getElementById('countdownTimer')?.remove();
+                return;
+            }
+
+            // Set target date to today with the specified time
+            let target = new Date(now);
+            target.setHours(targetTime.hour, targetTime.minute, 0, 0);
+
+            // If target time has passed today, set to tomorrow
+            if (now > target) {
+                target.setDate(target.getDate() + 1);
+            }
+
+            const diff = target - now;
+
+            if (diff <= 0) {
+                // Result should be available
+                const timerElement = document.getElementById('countdownTimer');
+                if (timerElement) {
+                    timerElement.innerHTML = '<span style="color: #4caf50;">✓ Result Available</span>';
+                }
+                // Refresh page to update results
+                setTimeout(function () {
+                    location.reload();
+                }, 60000); // Refresh every minute to check for updates
+                return;
+            }
+
+            // Calculate hours, minutes, seconds
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            // Update countdown display
+            const timerElement = document.getElementById('countdownTimer');
+            if (timerElement) {
+                timerElement.innerHTML = `
+                ⏰ Next Result in: 
+                <span class="time-remaining">
+                    ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}
+                </span>
+            `;
+            }
+        }
+
+        // Add countdown timer to the header
+        const headerBox = document.querySelector('.game-header-box');
+        if (headerBox) {
+            const countdownDiv = document.createElement('div');
+            countdownDiv.className = 'countdown-timer';
+            countdownDiv.id = 'countdownTimer';
+            headerBox.appendChild(countdownDiv);
+
+            // Update countdown every second
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+
+        // Auto-refresh the page at midnight to update results
+        function scheduleMidnightRefresh() {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 1, 0); // 12:00:01 AM
+
+            const timeToMidnight = tomorrow - now;
+
+            setTimeout(function () {
+                location.reload();
+            }, timeToMidnight);
+        }
+
+        scheduleMidnightRefresh();
+    });
+</script>
+
 <div class="game-page-container">
 
     <!-- Game Header -->
     <div class="game-header-box">
         <h1><?php echo htmlspecialchars(strtoupper($display_name)); ?></h1>
         <div class="game-time">⏰ Result Time: <?php echo htmlspecialchars($game_timing ?: 'N/A'); ?></div>
+        <div id="countdownTimer" class="countdown-timer">Loading timer...</div>
     </div>
 
     <!-- Game Info Cards -->
@@ -350,9 +555,10 @@ require_once 'header.php';
         </div>
         <div class="game-info-item">
             <div class="label">Today Result</div>
-            <div class="value result">
+            <div
+                class="value <?php echo ($current_result == 'WAIT' || $current_result == '-1' || empty($current_result)) ? 'wait' : 'result'; ?>">
                 <?php if ($current_result == 'WAIT' || $current_result == '-1' || empty($current_result)): ?>
-                    <span style="color: #d32f2f; font-size: 18px;">⏳ WAIT</span>
+                    ⏳ WAIT
                 <?php else: ?>
                     <?php echo htmlspecialchars($current_result); ?>
                 <?php endif; ?>
@@ -380,20 +586,20 @@ require_once 'header.php';
                 <tbody>
                     <?php if (!empty($chart_data)): ?>
                         <?php foreach ($chart_data as $row):
-                            // Parse date from DD-MM format
-                            $date_parts = explode('-', $row['date']);
-                            if (count($date_parts) == 2) {
-                                $day_num = intval($date_parts[0]);
-                                $month_num = intval($date_parts[1]);
-                                $year = date('Y');
-                                $timestamp = mktime(0, 0, 0, $month_num, $day_num, $year);
+                            // Parse date from YYYY-MM-DD format
+                            $date_parts = explode('-', $row['chart_date']);
+                            if (count($date_parts) == 3) {
+                                $year_num = $date_parts[0];
+                                $month_num = $date_parts[1];
+                                $day_num = $date_parts[2];
+                                $timestamp = mktime(0, 0, 0, $month_num, $day_num, $year_num);
                                 $date_formatted = date('d M Y', $timestamp);
                                 $day_name = date('l', $timestamp);
                             } else {
-                                $date_formatted = $row['date'];
+                                $date_formatted = $row['chart_date'];
                                 $day_name = '--';
                             }
-                            $result_number = $row['result_number'];
+                            $result_number = $row['result'];
                             ?>
                             <tr>
                                 <td class="date-col"><?php echo $date_formatted; ?></td>

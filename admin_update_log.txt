@@ -1,0 +1,19 @@
+[2026-06-29 16:23:24] === UPDATE ATTEMPT ===
+[2026-06-29 16:23:24] POST Data: Array
+(
+    [update_result] => 1
+    [game_name] => disawar
+    [display_name] => Puskar
+    [result_time] => 12:30 PM
+    [yesterday_result] => 42
+    [today_result] => 13
+)
+
+[2026-06-29 16:23:24] Game Name: disawar
+[2026-06-29 16:23:24] New Result: 13
+[2026-06-29 16:23:24] ✅ Found game ID: 8
+[2026-06-29 16:23:24] Current Today: 43
+[2026-06-29 16:23:24] Action: Manual update with custom yesterday result
+[2026-06-29 16:23:24] Rows affected: 1
+[2026-06-29 16:23:24] ✅ UPDATE SUCCESSFUL
+[2026-06-29 16:23:24] ==========================
