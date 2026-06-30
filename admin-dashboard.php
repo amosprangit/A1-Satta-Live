@@ -500,7 +500,7 @@ $disawer_yesterday = $disawer['yesterday_result'] ?? '05';
 
 // Fetch all games
 try {
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 ORDER BY table_type, id");
+    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE status = 1 ORDER BY table_type, id");
     $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $table1_games = [];
@@ -1153,7 +1153,7 @@ require_once 'header.php';
                     <select name="featured_game" required>
                         <option value="disawar" <?php echo (getWebsiteContent($pdo, 'featured_game') == 'disawar') ? 'selected' : ''; ?>>DISAWAR</option>
                         <?php
-                        $stmt = $pdo->query("SELECT game_name, display_name FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 ORDER BY game_name");
+                        $stmt = $pdo->query("SELECT game_name, display_name FROM game_results WHERE status = 1 ORDER BY game_name");
                         $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         foreach ($games as $game):
                             $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
@@ -1349,6 +1349,7 @@ require_once 'header.php';
 <script>
     // ===== EDIT GAME MODAL =====
     function openEditModal(game, yesterday, today, time, displayName) {
+        console.log(game)
         document.getElementById('editGameName').value = game;
         document.getElementById('editGameNameDisplay').value = game.toUpperCase();
         document.getElementById('editDisplayName').value = displayName || '';

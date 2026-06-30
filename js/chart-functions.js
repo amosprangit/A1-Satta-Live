@@ -45,7 +45,7 @@ function loadChartData() {
     " " +
     year;
 
-  // Fetch chart data
+  // Fetch chart data - Updated endpoint and parameters
   fetch("get-chart-data.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -85,7 +85,7 @@ function loadChartData() {
     });
 }
 
-// Render the chart table
+// Render the chart table - Updated for new schema
 function renderChartTable(data, game, year, month) {
   const display = document.getElementById("chartDataDisplay");
 
@@ -94,7 +94,7 @@ function renderChartTable(data, game, year, month) {
             <div style="text-align: center; padding: 60px 20px; background: #fff8e7; border-radius: 15px; border: 2px dashed #ffd700;">
                 <div style="font-size: 48px; margin-bottom: 20px;">📊</div>
                 <h3 style="color: #c49a00;">No chart data found for ${game.toUpperCase()}</h3>
-                <p style="color: #666;">No results found for this game.</p>
+                <p style="color: #666;">No results found for this game in ${monthNames[parseInt(month) - 1]} ${year}.</p>
                 <button onclick="window.location.href='admin-dashboard.php?tab=chart'" style="
                     margin-top: 15px;
                     padding: 12px 30px;
@@ -111,8 +111,8 @@ function renderChartTable(data, game, year, month) {
     return;
   }
 
-  // Calculate statistics
-  const results = data.map((item) => parseInt(item.result_number) || 0);
+  // Calculate statistics - Updated to use 'result' field
+  const results = data.map((item) => parseInt(item.result) || 0);
   const validResults = results.filter((r) => r > 0);
   const max = validResults.length > 0 ? Math.max(...validResults) : 0;
   const min = validResults.length > 0 ? Math.min(...validResults) : 0;
@@ -120,7 +120,7 @@ function renderChartTable(data, game, year, month) {
   const avg =
     validResults.length > 0 ? (sum / validResults.length).toFixed(1) : 0;
 
-  // Build table
+  // Build table - Updated to use chart_date and result
   let html = `
         <!-- Chart Table -->
         <div style="overflow-x: auto; background: #fff; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.08);">
@@ -136,9 +136,15 @@ function renderChartTable(data, game, year, month) {
 
   data.forEach((item, index) => {
     const rowColor = index % 2 === 0 ? "#f9f9f9" : "#ffffff";
-    const parts = item.date.split("-");
-    const day = parts[0] || item.date;
-    const resultNum = parseInt(item.result_number) || 0;
+    // Parse date from YYYY-MM-DD format to DD-MM for display
+    let displayDate = item.chart_date || item.date || "--";
+    if (displayDate !== "--") {
+      const parts = displayDate.split("-");
+      if (parts.length === 3) {
+        displayDate = parts[2] + "-" + parts[1];
+      }
+    }
+    const resultNum = parseInt(item.result) || 0;
     const isHigh = resultNum > 50;
     const resultColor = isHigh ? "#28a745" : resultNum > 0 ? "#dc3545" : "#666";
 
@@ -147,11 +153,11 @@ function renderChartTable(data, game, year, month) {
                 onmouseover="this.style.background='#fff8e0'" 
                 onmouseout="this.style.background='${rowColor}'">
                 <td style="padding: 12px 15px; text-align: center; font-weight: bold; font-size: 16px;">
-                    ${day}
+                    ${displayDate}
                 </td>
                 <td style="padding: 12px 15px; text-align: center; font-size: 24px; font-weight: bold; color: ${resultColor};">
-                    ${item.result_number || "--"}
-                    ${item.result_number ? (isHigh ? " " : "") : ""}
+                    ${item.result || "--"}
+                    ${item.result ? (isHigh ? " " : resultNum > 0 ? " " : "") : ""}
                 </td>
             </tr>
         `;
@@ -180,6 +186,22 @@ function renderChartTable(data, game, year, month) {
 
   display.innerHTML = html;
 }
+
+// Month names array for display
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 // ============ PLAY TIME EDITOR FUNCTIONS ============
 
@@ -220,7 +242,7 @@ function addTiming() {
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=add_timing&game=${encodeURIComponent(game)}&time=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`,
@@ -264,7 +286,7 @@ function updateTiming() {
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=update_timing&id=${id}&game=${encodeURIComponent(game)}&time=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`,
@@ -287,7 +309,7 @@ function cancelEditTiming() {
 function deleteTiming(id) {
   if (!confirm("Are you sure you want to delete this timing?")) return;
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=delete_timing&id=${id}`,
@@ -313,7 +335,7 @@ function addRate() {
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=add_rate&type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
@@ -354,7 +376,7 @@ function updateRate() {
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=update_rate&id=${id}&type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
@@ -377,10 +399,38 @@ function cancelEditRate() {
 function deleteRate(id) {
   if (!confirm("Are you sure you want to delete this rate?")) return;
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=delete_rate&id=${id}`,
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert("Error: " + data.message);
+      }
+    })
+    .catch((error) => alert("Error: " + error));
+}
+
+// ============ MULTIPLE RESULT CRUD ============
+function addMultipleResult() {
+  const game = document.getElementById("mrGameName").value.trim();
+  const date = document.getElementById("mrResultDate").value;
+  const number = document.getElementById("mrResultNumber").value.trim();
+  const time = document.getElementById("mrResultTime").value.trim();
+
+  if (!game || !date || !number) {
+    alert("Please fill in all fields!");
+    return;
+  }
+
+  fetch("ajax-handler.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `action=add_multiple_result&game=${encodeURIComponent(game)}&date=${encodeURIComponent(date)}&number=${encodeURIComponent(number)}&time=${encodeURIComponent(time)}`,
   })
     .then((response) => response.json())
     .then((data) => {

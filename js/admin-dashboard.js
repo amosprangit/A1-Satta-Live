@@ -1,8 +1,3 @@
-// ============================================
-// ADMIN DASHBOARD JAVASCRIPT
-// ============================================
-
-// ===== EDIT GAME MODAL =====
 function openEditModal(game, yesterday, today, time, displayName) {
   console.log("Opening edit for game: " + game);
   document.getElementById("editGameName").value = game;

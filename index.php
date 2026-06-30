@@ -39,10 +39,12 @@ $disawer_time = $disawer['result_time'] ?? '5:15 AM';
 // ===== FORCE FRESH DATA FROM DATABASE =====
 $pdo->query("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
 
-// Fetch all games dynamically from database - Updated for new schema
+// ============================================
+// FETCH ALL GAMES - FIXED
+// ============================================
 try {
     // Force fresh query with NO CACHE and status = 1 (active)
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 ORDER BY table_type, id");
+    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE status = 1 ORDER BY table_type, game_name");
     $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Create lookup array and separate by table type
@@ -50,24 +52,28 @@ try {
     $table1_game_names = [];
     $table2_game_names = [];
 
-    foreach ($all_games_data as $game) {
-        // Use game_name as key (lowercase for consistency)
-        $key = strtolower($game['game_name']);
-        $all_results[$key] = $game;
-        if ($game['table_type'] == 'table2') {
-            $table2_game_names[] = $game['game_name'];
-        } else {
-            $table1_game_names[] = $game['game_name'];
+    // If there are games in database, use them
+    if (!empty($all_games_data)) {
+        foreach ($all_games_data as $game) {
+            // Use game_name as key (lowercase for consistency)
+            $key = strtolower($game['game_name']);
+            $all_results[$key] = $game;
+            if ($game['table_type'] == 'table2') {
+                $table2_game_names[] = $game['game_name'];
+            } else {
+                $table1_game_names[] = $game['game_name'];
+            }
         }
     }
 
-    // Fallback if database is empty
+    // ONLY use fallback if NO games exist in database at all
     if (empty($table1_game_names) && empty($table2_game_names)) {
         $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
         $table2_game_names = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
     }
 } catch (PDOException $e) {
-    // Fallback to default lists if database query fails
+    // Log error and only use fallback if database query fails
+    error_log("Database error in index.php: " . $e->getMessage());
     $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
     $table2_game_names = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
     $all_results = [];
@@ -144,7 +150,7 @@ require_once 'header.php';
 <?php
 // Get the most recently updated game (for live box) - Updated for new schema
 try {
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE LOWER(game_name) != 'disawar' AND status = 1 AND is_latest = 1 ORDER BY id DESC LIMIT 1");
+    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE status = 1 AND is_latest = 1 ORDER BY id DESC LIMIT 1");
     $latest_game = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // If no other game found, use disawar
@@ -174,9 +180,6 @@ $live_time = $latest_game['result_time'] ?? '--';
             echo htmlspecialchars($live_result);
         }
         ?>
-    </div>
-    <div style="font-size: 14px; color: #aaa; margin-top: 10px;">
-        ⏰ <?php echo htmlspecialchars($live_time); ?>
     </div>
 </div>
 

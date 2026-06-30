@@ -94,11 +94,11 @@ function addGame($pdo, $data)
     $stmt = $pdo->prepare("INSERT INTO game_results (game_name, display_name, today_result, yesterday_result, result_time, table_type, status, is_latest) 
                            VALUES (?, ?, ?, ?, ?, ?, 1, 1)");
     return $stmt->execute([
-        $data['game_name'], 
-        $data['display_name'], 
-        $data['today_result'], 
-        $data['yesterday_result'], 
-        $data['result_time'], 
+        $data['game_name'],
+        $data['display_name'],
+        $data['today_result'],
+        $data['yesterday_result'],
+        $data['result_time'],
         $data['table_type']
     ]);
 }
@@ -113,10 +113,10 @@ function updateGame($pdo, $data)
         is_latest = 1
         WHERE LOWER(game_name) = LOWER(?)");
     return $stmt->execute([
-        $data['today_result'], 
-        $data['yesterday_result'], 
-        $data['result_time'], 
-        $data['display_name'], 
+        $data['today_result'],
+        $data['yesterday_result'],
+        $data['result_time'],
+        $data['display_name'],
         $data['game_name']
     ]);
 }
@@ -127,7 +127,7 @@ function deleteGame($pdo, $game_name)
         // Delete from chart_data first
         $stmt = $pdo->prepare("DELETE FROM chart_data WHERE LOWER(game_name) = LOWER(?)");
         $stmt->execute([$game_name]);
-        
+
         // Delete from game_results
         $stmt = $pdo->prepare("DELETE FROM game_results WHERE LOWER(game_name) = LOWER(?)");
         return $stmt->execute([$game_name]);
@@ -209,7 +209,7 @@ function getChartDataByMonth($pdo, $game_name, $year, $month)
     try {
         $start_date = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
         $end_date = date('Y-m-t', strtotime($start_date));
-        
+
         $stmt = $pdo->prepare("SELECT chart_date, result FROM chart_data 
                                WHERE LOWER(game_name) = LOWER(?) 
                                AND chart_date BETWEEN ? AND ?
@@ -288,7 +288,7 @@ function getAllGameTimings($pdo)
 
 function addGameTiming($pdo, $game_name, $timing, $emoji = '😇')
 {
-    $stmt = $pdo->prepare("INSERT INTO game_timings (game_name, timing, emoji) VALUES (?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO game_timings (game_name, timing, emoji, is_active) VALUES (?, ?, ?, 1)");
     return $stmt->execute([$game_name, $timing, $emoji]);
 }
 
@@ -366,7 +366,7 @@ function getAllGameRates($pdo)
 
 function addGameRate($pdo, $rate_type, $rate_value, $display_order = 0)
 {
-    $stmt = $pdo->prepare("INSERT INTO game_rates (rate_type, rate_value, display_order) VALUES (?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO game_rates (rate_type, rate_value, display_order, is_active) VALUES (?, ?, ?, 1)");
     return $stmt->execute([$rate_type, $rate_value, $display_order]);
 }
 
@@ -449,7 +449,10 @@ function getGamesByTable($pdo, $table_type)
 function getGameNames($pdo)
 {
     $stmt = $pdo->query("SELECT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
-    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $result = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    // Debug log to see what's being returned
+    error_log("getGameNames() returned: " . count($result) . " games: " . implode(', ', $result));
+    return $result;
 }
 
 function getGameDisplayName($pdo, $game_name)
@@ -472,5 +475,18 @@ function updateIsLatest($pdo)
     $pdo->query("UPDATE game_results SET is_latest = 0");
     // Set is_latest = 1 for games with today_result != WAIT
     $pdo->query("UPDATE game_results SET is_latest = 1 WHERE today_result != 'WAIT' AND today_result != '-1' AND today_result != '' AND status = 1");
+}
+
+// ============ DEBUG FUNCTIONS ============
+function debugGameStatus($pdo)
+{
+    $stmt = $pdo->query("SELECT id, game_name, status, table_type, today_result FROM game_results ORDER BY id");
+    $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    error_log("=== GAME STATUS DEBUG ===");
+    foreach ($games as $g) {
+        error_log("ID: {$g['id']} | Game: {$g['game_name']} | Status: {$g['status']} | Table: {$g['table_type']} | Today: {$g['today_result']}");
+    }
+    error_log("=========================");
+    return $games;
 }
 ?>

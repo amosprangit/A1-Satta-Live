@@ -16,31 +16,27 @@ if (empty($game)) {
 }
 
 try {
-
     error_log("Chart Search => Game: $game | Month: $month | Year: $year");
 
-    /*
-     * Database date format:
-     * 01-06
-     * 02-06
-     * 03-06
-     * etc.
-     *
-     * Therefore we search by month only:
-     * %-06
-     */
-
+    
+    $start_date = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
+    $end_date = date('Y-m-t', strtotime($start_date));
+    
+    error_log("Date range: $start_date to $end_date");
+    
+    // Query using new schema (chart_date, result)
     $stmt = $pdo->prepare("
-        SELECT *
+        SELECT chart_date, result
         FROM chart_data
-        WHERE TRIM(game_name) = TRIM(?)
-        AND date LIKE ?
-        ORDER BY CAST(SUBSTRING_INDEX(date,'-',1) AS UNSIGNED) ASC
+        WHERE LOWER(game_name) = LOWER(?)
+        AND chart_date BETWEEN ? AND ?
+        ORDER BY chart_date DESC
     ");
 
     $stmt->execute([
         $game,
-        '%-' . $month
+        $start_date,
+        $end_date
     ]);
 
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -48,14 +44,12 @@ try {
     error_log("Chart Results Found: " . count($results));
 
     if (empty($results)) {
-
-        // Debug check if game exists at all
+        // Debug check if game exists at all in chart_data
         $checkStmt = $pdo->prepare("
             SELECT COUNT(*) as total
             FROM chart_data
-            WHERE TRIM(game_name) = TRIM(?)
+            WHERE LOWER(game_name) = LOWER(?)
         ");
-
         $checkStmt->execute([$game]);
         $gameExists = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -70,7 +64,6 @@ try {
                 'message' => 'No chart data found for ' . strtoupper($game)
             ]);
         }
-
         exit();
     }
 
@@ -84,13 +77,16 @@ try {
     ]);
 
 } catch (PDOException $e) {
-
     error_log("Chart Data Error: " . $e->getMessage());
-
     echo json_encode([
         'success' => false,
-        'message' => 'Database Error',
-        'error' => $e->getMessage()
+        'message' => 'Database Error: ' . $e->getMessage()
+    ]);
+} catch (Exception $e) {
+    error_log("Chart Data Error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error: ' . $e->getMessage()
     ]);
 }
 ?>

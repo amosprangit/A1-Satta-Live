@@ -17,3 +17,98 @@
 [2026-06-29 16:23:24] Rows affected: 1
 [2026-06-29 16:23:24] ✅ UPDATE SUCCESSFUL
 [2026-06-29 16:23:24] ==========================
+[2026-06-29 18:03:22] === UPDATE ATTEMPT ===
+[2026-06-29 18:03:22] POST Data: Array
+(
+    [update_result] => 1
+    [game_name] => disawar
+    [display_name] => Pushkar
+    [result_time] => 12:30PM
+    [yesterday_result] => 
+    [today_result] => 34
+)
+
+[2026-06-29 18:03:22] Game Name: disawar
+[2026-06-29 18:03:22] New Result: 34
+[2026-06-29 18:03:22] ✅ Found game ID: 8
+[2026-06-29 18:03:22] Current Today: 13
+[2026-06-29 18:03:22] Action: Result moved from today to yesterday
+[2026-06-29 18:03:22] Rows affected: 1
+[2026-06-29 18:03:22] ✅ UPDATE SUCCESSFUL
+[2026-06-29 18:03:22] ==========================
+[2026-06-29 18:33:34] === UPDATE ATTEMPT ===
+[2026-06-29 18:33:34] POST Data: Array
+(
+    [update_result] => 1
+    [game_name] => disawar
+    [display_name] => Pushkar
+    [result_time] => 12:30PM
+    [yesterday_result] => 13
+    [today_result] => 34
+)
+
+[2026-06-29 18:33:34] Game Name: disawar
+[2026-06-29 18:33:34] New Result: 34
+[2026-06-29 18:33:34] ✅ Found game ID: 8
+[2026-06-29 18:33:34] Current Today: 34
+[2026-06-29 18:33:34] Action: Manual update with custom yesterday result
+[2026-06-29 18:33:34] Rows affected: 0
+[2026-06-29 18:33:34] ✅ UPDATE SUCCESSFUL
+[2026-06-29 18:33:34] ==========================
+[2026-06-29 18:34:16] === UPDATE ATTEMPT ===
+[2026-06-29 18:34:16] POST Data: Array
+(
+    [update_result] => 1
+    [game_name] => delhi_bazar
+    [display_name] => DELHI BAZAR
+    [result_time] => 3:15 PM
+    [yesterday_result] => --
+    [today_result] => 56
+)
+
+[2026-06-29 18:34:16] Game Name: delhi_bazar
+[2026-06-29 18:34:16] New Result: 56
+[2026-06-29 18:34:16] ✅ Found game ID: 4
+[2026-06-29 18:34:16] Current Today: WAIT
+[2026-06-29 18:34:16] Action: WAIT replaced with new result
+[2026-06-29 18:34:16] Rows affected: 1
+[2026-06-29 18:34:16] ✅ UPDATE SUCCESSFUL
+[2026-06-29 18:34:16] ==========================
+[2026-06-29 18:34:53] === UPDATE ATTEMPT ===
+[2026-06-29 18:34:53] POST Data: Array
+(
+    [update_result] => 1
+    [game_name] => gaziabad
+    [display_name] => GAZIABAD
+    [result_time] => 9:50 PM
+    [yesterday_result] => --
+    [today_result] => 42
+)
+
+[2026-06-29 18:34:53] Game Name: gaziabad
+[2026-06-29 18:34:53] New Result: 42
+[2026-06-29 18:34:53] ✅ Found game ID: 6
+[2026-06-29 18:34:53] Current Today: WAIT
+[2026-06-29 18:34:53] Action: WAIT replaced with new result
+[2026-06-29 18:34:53] Rows affected: 1
+[2026-06-29 18:34:53] ✅ UPDATE SUCCESSFUL
+[2026-06-29 18:34:53] ==========================
+[2026-06-29 18:40:16] === UPDATE ATTEMPT ===
+[2026-06-29 18:40:16] POST Data: Array
+(
+    [update_result] => 1
+    [game_name] => sadar_bazar
+    [display_name] => SADAR BAZAR
+    [result_time] => 1:40 PM
+    [yesterday_result] => --
+    [today_result] => 32
+)
+
+[2026-06-29 18:40:16] Game Name: sadar_bazar
+[2026-06-29 18:40:16] New Result: 32
+[2026-06-29 18:40:16] ✅ Found game ID: 2
+[2026-06-29 18:40:16] Current Today: WAIT
+[2026-06-29 18:40:16] Action: WAIT replaced with new result
+[2026-06-29 18:40:16] Rows affected: 1
+[2026-06-29 18:40:16] ✅ UPDATE SUCCESSFUL
+[2026-06-29 18:40:16] ==========================
