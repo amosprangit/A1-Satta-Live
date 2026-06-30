@@ -43,8 +43,9 @@ $pdo->query("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
 // FETCH ALL GAMES - FIXED
 // ============================================
 try {
-    // Force fresh query with NO CACHE and status = 1 (active)
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE status = 1 ORDER BY table_type, game_name");
+    // Force fresh query with status = 1 (active)
+    // Order by ID to match database order
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 1 ORDER BY id ASC");
     $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Create lookup array and separate by table type
@@ -68,14 +69,13 @@ try {
 
     // ONLY use fallback if NO games exist in database at all
     if (empty($table1_game_names) && empty($table2_game_names)) {
-        $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
-        $table2_game_names = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
+        $table1_game_names = ['pushkar', 'sadar_bazar', 'gwalior', 'delhi_bazar', 'shri_ganesh', 'gaziabad', 'gali'];
+        $table2_game_names = ['disawar', 'faridabad'];
     }
 } catch (PDOException $e) {
-    // Log error and only use fallback if database query fails
     error_log("Database error in index.php: " . $e->getMessage());
-    $table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
-    $table2_game_names = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
+    $table1_game_names = ['pushkar', 'sadar_bazar', 'gwalior', 'delhi_bazar', 'shri_ganesh', 'gaziabad', 'gali'];
+    $table2_game_names = ['disawar', 'faridabad'];
     $all_results = [];
 }
 

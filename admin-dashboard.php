@@ -500,35 +500,39 @@ $disawer_yesterday = $disawer['yesterday_result'] ?? '05';
 
 // Fetch all games
 try {
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE status = 1 ORDER BY table_type, id");
-    $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Get Table 1 games ordered by ID
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 1 AND table_type = 'table1' ORDER BY id ASC");
+    $table1_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Get Table 2 games ordered by ID
+    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 1 AND table_type = 'table2' ORDER BY id ASC");
+    $table2_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $all_games = [];
     $table1_games = [];
     $table2_games = [];
-    $all_games = [];
 
-    foreach ($all_games_data as $game) {
+    foreach ($table1_data as $game) {
         $all_games[$game['game_name']] = $game;
-        if ($game['table_type'] == 'table2') {
-            $table2_games[] = $game['game_name'];
-        } else {
-            $table1_games[] = $game['game_name'];
-        }
+        $table1_games[] = $game['game_name'];
     }
 
-    if (empty($table1_games)) {
-        $table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
+    foreach ($table2_data as $game) {
+        $all_games[$game['game_name']] = $game;
+        $table2_games[] = $game['game_name'];
     }
-    if (empty($table2_games)) {
-        $table2_games = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
+
+    if (empty($table1_games) && empty($table2_games)) {
+        $table1_games = ['pushkar', 'sadar_bazar', 'gwalior', 'delhi_bazar', 'shri_ganesh', 'gaziabad', 'gali'];
+        $table2_games = ['disawar', 'faridabad'];
     }
 
 } catch (PDOException $e) {
-    $table1_games = ['sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
-    $table2_games = ['mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman', 'pushkar'];
+    error_log("Database error: " . $e->getMessage());
+    $table1_games = ['pushkar', 'sadar_bazar', 'gwalior', 'delhi_bazar', 'shri_ganesh', 'gaziabad', 'gali'];
+    $table2_games = ['disawar', 'faridabad'];
     $all_games = [];
 }
-
 try {
     $stmt = $pdo->query("SELECT * FROM chart_data ORDER BY id DESC");
     $all_chart_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -648,7 +652,8 @@ require_once 'header.php';
                             $display = getGameDisplayName($pdo, $game);
                             ?>
                             <option value="<?php echo htmlspecialchars($game); ?>">
-                                <?php echo htmlspecialchars(strtoupper($display)); ?></option>
+                                <?php echo htmlspecialchars(strtoupper($display)); ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -936,7 +941,8 @@ require_once 'header.php';
                                     <td><strong><?php echo ucfirst($row['game_name']); ?></strong></td>
                                     <td><?php echo $row['chart_date']; ?></td>
                                     <td style="font-weight:bold; color:#c49a00; font-size:18px;">
-                                        <?php echo $row['result'] ?: '--'; ?></td>
+                                        <?php echo $row['result'] ?: '--'; ?>
+                                    </td>
                                     <td>
                                         <div class="actions-cell">
                                             <a href="admin-dashboard.php?tab=chart&edit_game=<?php echo urlencode($row['game_name']); ?>&edit_date=<?php echo urlencode($row['chart_date']); ?>&edit_result=<?php echo urlencode($row['result']); ?>"
@@ -1123,7 +1129,8 @@ require_once 'header.php';
                                     <td><strong><?php echo ucfirst($result['game_name']); ?></strong></td>
                                     <td><?php echo $result['result_date']; ?></td>
                                     <td style="font-weight:bold; color:#c49a00; font-size:18px;">
-                                        <?php echo $result['result_number']; ?></td>
+                                        <?php echo $result['result_number']; ?>
+                                    </td>
                                     <td><?php echo $result['result_time'] ?: '--'; ?></td>
                                     <td>
                                         <div class="actions-cell">
@@ -1160,7 +1167,8 @@ require_once 'header.php';
                             $selected = (getWebsiteContent($pdo, 'featured_game') == $game['game_name']) ? 'selected' : '';
                             ?>
                             <option value="<?php echo htmlspecialchars($game['game_name']); ?>" <?php echo $selected; ?>>
-                                <?php echo htmlspecialchars($display_name); ?></option>
+                                <?php echo htmlspecialchars($display_name); ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
