@@ -36,14 +36,6 @@ function loginAdmin($pdo, $username, $password)
     }
     return false;
 }
-
-function logoutAdmin()
-{
-    session_destroy();
-    header('Location: admin-login.php');
-    exit();
-}
-
 // ============ GAME RESULTS CRUD ============
 function getAllGames($pdo)
 {
@@ -72,15 +64,6 @@ function getWebsiteContent($pdo, $key)
     }
 }
 
-function updateWebsiteContent($pdo, $key, $value)
-{
-    try {
-        $stmt = $pdo->prepare("INSERT INTO website_content (content_key, content_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE content_value = ?");
-        return $stmt->execute([$key, $value, $value]);
-    } catch (PDOException $e) {
-        return false;
-    }
-}
 
 function getGameResults($pdo, $game_name)
 {
@@ -156,13 +139,13 @@ function updateDisawer($pdo, $today_result, $yesterday_result, $display_name = '
 }
 
 // ============ CHART DATA CRUD (Updated for new schema) ============
-function getChartData($pdo, $game_name, $date)
-{
-    $stmt = $pdo->prepare("SELECT result FROM chart_data WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
-    $stmt->execute([$game_name, $date]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $result ? $result['result'] : '--';
-}
+// function getChartData($pdo, $game_name, $date)
+// {
+//     $stmt = $pdo->prepare("SELECT result FROM chart_data WHERE LOWER(game_name) = LOWER(?) AND chart_date = ?");
+//     $stmt->execute([$game_name, $date]);
+//     $result = $stmt->fetch(PDO::FETCH_ASSOC);
+//     return $result ? $result['result'] : '--';
+// }
 
 function getAllChartData($pdo)
 {
@@ -223,22 +206,22 @@ function getChartDataByMonth($pdo, $game_name, $year, $month)
 }
 
 // ============ GAME CHART DATA FOR DEDICATED PAGES ============
-function getGameChartData($pdo, $game_name, $year, $month)
-{
-    return getChartDataByMonth($pdo, $game_name, $year, $month);
-}
+// function getGameChartData($pdo, $game_name, $year, $month)
+// {
+//     return getChartDataByMonth($pdo, $game_name, $year, $month);
+// }
 
-function getGameTiming($pdo, $game_name)
-{
-    try {
-        $stmt = $pdo->prepare("SELECT timing FROM game_timings WHERE LOWER(game_name) = LOWER(?) AND is_active = 1 LIMIT 1");
-        $stmt->execute([$game_name]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ? $result['timing'] : null;
-    } catch (PDOException $e) {
-        return null;
-    }
-}
+// function getGameTiming($pdo, $game_name)
+// {
+//     try {
+//         $stmt = $pdo->prepare("SELECT timing FROM game_timings WHERE LOWER(game_name) = LOWER(?) AND is_active = 1 LIMIT 1");
+//         $stmt->execute([$game_name]);
+//         $result = $stmt->fetch(PDO::FETCH_ASSOC);
+//         return $result ? $result['timing'] : null;
+//     } catch (PDOException $e) {
+//         return null;
+//     }
+// }
 
 function getGameInfo($pdo, $game_name)
 {
@@ -274,11 +257,11 @@ function getAllChartDataForGame($pdo, $game_name)
 }
 
 // ============ GAME TIMINGS CRUD ============
-function getGameTimings($pdo)
-{
-    $stmt = $pdo->query("SELECT * FROM game_timings WHERE is_active = 1 ORDER BY display_order");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+// function getGameTimings($pdo)
+// {
+//     $stmt = $pdo->query("SELECT * FROM game_timings WHERE is_active = 1 ORDER BY display_order");
+//     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+// }
 
 function getAllGameTimings($pdo)
 {
@@ -352,11 +335,11 @@ function deleteGameResult($pdo, $id)
 }
 
 // ============ GAME RATES CRUD ============
-function getGameRates($pdo)
-{
-    $stmt = $pdo->query("SELECT * FROM game_rates WHERE is_active = 1 ORDER BY display_order");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+// function getGameRates($pdo)
+// {
+//     $stmt = $pdo->query("SELECT * FROM game_rates WHERE is_active = 1 ORDER BY display_order");
+//     return $stmt->fetchAll(PDO::FETCH_ASSOC);
+// }
 
 function getAllGameRates($pdo)
 {
@@ -455,13 +438,13 @@ function getGameNames($pdo)
     return $result;
 }
 
-function getGameDisplayName($pdo, $game_name)
-{
-    $stmt = $pdo->prepare("SELECT display_name FROM game_results WHERE LOWER(game_name) = LOWER(?) AND status = 1");
-    $stmt->execute([$game_name]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $result ? $result['display_name'] : ucfirst($game_name);
-}
+// function getGameDisplayName($pdo, $game_name)
+// {
+//     $stmt = $pdo->prepare("SELECT display_name FROM game_results WHERE LOWER(game_name) = LOWER(?) AND status = 1");
+//     $stmt->execute([$game_name]);
+//     $result = $stmt->fetch(PDO::FETCH_ASSOC);
+//     return $result ? $result['display_name'] : ucfirst($game_name);
+// }
 
 function getLatestGameResult($pdo)
 {
@@ -489,4 +472,4 @@ function debugGameStatus($pdo)
     error_log("=========================");
     return $games;
 }
-?>
+?> 

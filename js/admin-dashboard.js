@@ -1,17 +1,13 @@
+// ============================================
+// EDIT GAME MODAL - FIXED
+// ============================================
 function openEditModal(game, yesterday, today, time, displayName) {
-  console.log("Opening edit for game: " + game);
   document.getElementById("editGameName").value = game;
   document.getElementById("editGameNameDisplay").value = game.toUpperCase();
   document.getElementById("editDisplayName").value = displayName || "";
-  document.getElementById("editYesterdayDisplay").textContent =
-    yesterday || "--";
-  document.getElementById("editTodayDisplay").textContent = today || "WAIT";
-  document.getElementById("editTodayDisplay").style.color =
-    today === "WAIT" || today === "-1" || !today ? "#d32f2f" : "#28a745";
-  document.getElementById("editToday").value = "";
-  document.getElementById("editToday").placeholder =
-    today === "WAIT" ? "Enter new result" : "Current: " + today;
-  document.getElementById("editTime").value = time;
+  document.getElementById("editYesterday").value = yesterday || "--";
+  document.getElementById("editToday").value = today || "WAIT";
+  document.getElementById("editTime").value = time || "";
   document.getElementById("editModal").style.display = "flex";
 }
 
@@ -19,12 +15,75 @@ function closeEditModal() {
   document.getElementById("editModal").style.display = "none";
 }
 
-// ===== TIMING EDIT MODAL =====
+// ============================================
+// DYNAMIC GAME SELECTOR - FIXED
+// ============================================
+function loadGameData(gameName) {
+  if (!gameName) {
+    document.getElementById("gameInfoDisplay").style.display = "none";
+    return;
+  }
+
+  document.getElementById("gameInfoDisplay").style.display = "block";
+  document.getElementById("currentStatus").innerHTML = "⏳ Loading...";
+
+  fetch("ajax/get-game-info.php?game=" + encodeURIComponent(gameName))
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.success) {
+        document.getElementById("editDisplayName").value =
+          data.display_name || "";
+        document.getElementById("editResultTime").value =
+          data.result_time || "";
+        document.getElementById("editYesterdayResult").value =
+          data.yesterday_result || "--";
+        document.getElementById("editTodayResult").value =
+          data.today_result || "WAIT";
+
+        let sourceInfo = data.source || "Main Table";
+        document.getElementById("currentStatus").innerHTML =
+          "📊 <strong>Today:</strong> " +
+          (data.today_result || "WAIT") +
+          " | <strong>Yesterday:</strong> " +
+          (data.yesterday_result || "--") +
+          " | <strong>Time:</strong> " +
+          (data.result_time || "--") +
+          " | <strong>Source:</strong> " +
+          sourceInfo;
+      } else {
+        document.getElementById("currentStatus").innerHTML =
+          "⚠️ Game not found or inactive";
+      }
+    })
+    .catch((error) => {
+      console.log("Error loading game data:", error);
+      document.getElementById("currentStatus").innerHTML =
+        "❌ Error loading game data";
+    });
+}
+
+// ============================================
+// CLEAR FORM - FIXED
+// ============================================
+function clearForm() {
+  document.getElementById("selectGameName").value = "";
+  document.getElementById("editDisplayName").value = "";
+  document.getElementById("editResultTime").value = "";
+  document.getElementById("editYesterdayResult").value = "";
+  document.getElementById("editTodayResult").value = "";
+  document.getElementById("gameInfoDisplay").style.display = "none";
+  document.getElementById("currentStatus").innerHTML =
+    "Select a game to view details";
+}
+
+// ============================================
+// TIMING EDIT MODAL
+// ============================================
 function openTimingEditModal(id, gameName, timing, emoji, isActive) {
   document.getElementById("timingEditId").value = id;
   document.getElementById("timingEditGameName").value = gameName;
   document.getElementById("timingEditTime").value = timing;
-  document.getElementById("timingEditEmoji").value = emoji;
+  document.getElementById("timingEditEmoji").value = emoji || "😇";
   document.getElementById("timingEditActive").value = isActive;
   document.getElementById("timingEditModal").style.display = "flex";
 }
@@ -33,7 +92,9 @@ function closeTimingEditModal() {
   document.getElementById("timingEditModal").style.display = "none";
 }
 
-// ===== RATE EDIT MODAL =====
+// ============================================
+// RATE EDIT MODAL
+// ============================================
 function openRateEditModal(id, rateType, rateValue, isActive) {
   document.getElementById("rateEditId").value = id;
   document.getElementById("rateEditType").value = rateType;
@@ -46,28 +107,68 @@ function closeRateEditModal() {
   document.getElementById("rateEditModal").style.display = "none";
 }
 
-// ===== MULTIPLE RESULT EDIT MODAL =====
-function openMultipleResultEditModal(id, gameName, date, number, time) {
-  document.getElementById("mrEditId").value = id;
-  document.getElementById("mrEditGameName").value = gameName;
-  document.getElementById("mrEditDate").value = date;
-  document.getElementById("mrEditNumber").value = number;
-  document.getElementById("mrEditTime").value = time || "";
-  document.getElementById("multipleResultEditModal").style.display = "flex";
+// ============================================
+// TABLE EDIT MODAL
+// ============================================
+function openEditTableModal(id, name, description) {
+  document.getElementById("editTableId").value = id;
+  document.getElementById("editTableName").value = name || "";
+  document.getElementById("editTableDescription").value = description || "";
+  document.getElementById("editTableModal").style.display = "flex";
 }
 
-function closeMultipleResultEditModal() {
-  document.getElementById("multipleResultEditModal").style.display = "none";
+function closeEditTableModal() {
+  document.getElementById("editTableModal").style.display = "none";
 }
 
-// ===== CLOSE MODALS ON CLICK OUTSIDE =====
+// ============================================
+// TABLE GAME EDIT MODAL
+// ============================================
+function openTableGameEditModal(
+  id,
+  tableId,
+  gameName,
+  displayName,
+  yesterday,
+  today,
+  time,
+) {
+  document.getElementById("editTableGameId").value = id;
+  document.getElementById("editTableGameTableId").value = tableId;
+  document.getElementById("editTableGameName").value = gameName;
+  document.getElementById("editTableGameDisplayName").value = displayName || "";
+  document.getElementById("editTableGameYesterday").value = yesterday || "--";
+  document.getElementById("editTableGameToday").value = today || "WAIT";
+  document.getElementById("editTableGameTime").value = time || "";
+  document.getElementById("editTableGameModal").style.display = "flex";
+}
+
+function closeEditTableGameModal() {
+  document.getElementById("editTableGameModal").style.display = "none";
+}
+
+// ============================================
+// AUTO-LOAD ON PAGE LOAD
+// ============================================
+document.addEventListener("DOMContentLoaded", function () {
+  const select = document.getElementById("selectGameName");
+  if (select && select.value) {
+    loadGameData(select.value);
+  }
+});
+
+// ============================================
+// CLOSE MODALS ON CLICK OUTSIDE
+// ============================================
 window.onclick = function (event) {
   if (event.target.classList.contains("modal")) {
     event.target.style.display = "none";
   }
 };
 
-// ===== CLOSE MODALS WITH ESCAPE KEY =====
+// ============================================
+// CLOSE MODALS WITH ESCAPE KEY
+// ============================================
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") {
     document.querySelectorAll(".modal").forEach(function (el) {
@@ -77,15 +178,17 @@ document.addEventListener("keydown", function (event) {
 });
 
 // ============================================
-// OPTIONAL: AUTO-REFRESH ON SUCCESS
+// ADD: FORCE REFRESH FOR LIVE BOX (Optional)
 // ============================================
-// Uncomment this if you want auto-refresh after update
-/*
-setTimeout(function() {
-    if (document.querySelector('.success-msg')) {
-        setTimeout(function() {
-            location.reload();
-        }, 3000);
-    }
-}, 1000);
-*/
+// This can be used after updating a result to refresh the Live Box
+function refreshLiveBox() {
+  const liveBox = document.querySelector(".live-box");
+  if (liveBox) {
+    // Add a flash effect to indicate update
+    liveBox.style.transition = "background 0.3s";
+    liveBox.style.background = "#2a2a4e";
+    setTimeout(() => {
+      liveBox.style.background = "";
+    }, 500);
+  }
+}

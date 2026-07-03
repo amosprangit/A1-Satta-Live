@@ -1,4 +1,4 @@
-<?
+<?php
 date_default_timezone_set('Asia/Kolkata');
 require_once 'config.php';
 
@@ -50,13 +50,35 @@ try {
         }
     }
 
-    // Set is_latest = 1 for games that have today_result != WAIT
-    $stmt = $pdo->query("UPDATE game_results SET is_latest = 1 WHERE today_result != 'WAIT' AND today_result != '-1' AND today_result != '' AND today_result IS NOT NULL AND status = 1");
-    $latest_count = $stmt->rowCount();
-    log_message("Set is_latest = 1 for $latest_count games with results");
+    // ============================================
+    // FIX: Reset ALL is_latest to 0, then set ONLY ONE
+    // ============================================
+
+    // Step 1: Reset ALL is_latest flags to 0
+    $pdo->query("UPDATE game_results SET is_latest = 0 WHERE status = 1");
+    log_message("✅ Reset all is_latest flags to 0");
+
+    // Step 2: Set is_latest = 1 for Disawar (or your preferred default game)
+    // This ensures the Live Box shows Disawar after midnight
+    $stmt = $pdo->prepare("UPDATE game_results SET is_latest = 1 WHERE LOWER(game_name) = 'disawar' AND status = 1");
+    $stmt->execute();
+
+    if ($stmt->rowCount() > 0) {
+        log_message("✅ Set is_latest = 1 for Disawar");
+    } else {
+        // If Disawar doesn't exist, set the first game as latest
+        log_message("⚠️ Disawar not found, setting first active game as latest");
+        $stmt = $pdo->query("SELECT id FROM game_results WHERE status = 1 ORDER BY id LIMIT 1");
+        $first = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($first) {
+            $stmt = $pdo->prepare("UPDATE game_results SET is_latest = 1 WHERE id = ?");
+            $stmt->execute([$first['id']]);
+            log_message("✅ Set is_latest = 1 for game ID: " . $first['id']);
+        }
+    }
 
     log_message("===== CRON JOB COMPLETED =====");
-    log_message("Updated: $updated_count games, Skipped: $skipped_count games, Latest set: $latest_count games");
+    log_message("Updated: $updated_count games, Skipped: $skipped_count games");
     log_message("");
 
 } catch (PDOException $e) {
@@ -64,3 +86,4 @@ try {
 } catch (Exception $e) {
     log_message("❌ ERROR: " . $e->getMessage());
 }
+?>

@@ -456,7 +456,8 @@
 .tab-btn {
   padding: 8px 15px;
   border: 2px solid #ffd700;
-  background: transparent;
+  opacity: 90%;
+  background: #ffd700;
   border-radius: 25px;
   font-weight: bold;
   cursor: pointer;
@@ -469,12 +470,11 @@
 }
 
 .tab-btn.active {
-  background: #ffd700;
   color: #000;
 }
 
 .tab-btn:hover {
-  background: #ffd700;
+  opacity: 100%;
   color: #000;
 }
 

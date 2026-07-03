@@ -1,0 +1,24 @@
+[2026-07-03 09:47:30] ===== CRON JOB STARTED =====
+[2026-07-03 09:47:30] Processing game: pushkar (ID: 1) - Today result: '13'
+[2026-07-03 09:47:30] ✅ Updated game: pushkar - Moved '13' to yesterday_result, set today to WAIT
+[2026-07-03 09:47:30] Processing game: sadar bazar (ID: 2) - Today result: '32'
+[2026-07-03 09:47:30] ✅ Updated game: sadar bazar - Moved '32' to yesterday_result, set today to WAIT
+[2026-07-03 09:47:30] Processing game: gwalior (ID: 3) - Today result: '44'
+[2026-07-03 09:47:30] ✅ Updated game: gwalior - Moved '44' to yesterday_result, set today to WAIT
+[2026-07-03 09:47:30] Processing game: shri ganesh (ID: 5) - Today result: 'WAIT'
+[2026-07-03 09:47:30] ⏭️ Skipped game: shri ganesh - Today result is already WAIT or empty
+[2026-07-03 09:47:30] Processing game: gaziabad (ID: 6) - Today result: 'WAIT'
+[2026-07-03 09:47:30] ⏭️ Skipped game: gaziabad - Today result is already WAIT or empty
+[2026-07-03 09:47:30] Processing game: gali (ID: 7) - Today result: '58'
+[2026-07-03 09:47:30] ✅ Updated game: gali - Moved '58' to yesterday_result, set today to WAIT
+[2026-07-03 09:47:30] Processing game: disawar (ID: 8) - Today result: 'WAIT'
+[2026-07-03 09:47:30] ⏭️ Skipped game: disawar - Today result is already WAIT or empty
+[2026-07-03 09:47:30] Processing game: faridabad (ID: 9) - Today result: 'WAIT'
+[2026-07-03 09:47:30] ⏭️ Skipped game: faridabad - Today result is already WAIT or empty
+[2026-07-03 09:47:30] Processing game: delhi bazar (ID: 12) - Today result: 'WAIT'
+[2026-07-03 09:47:30] ⏭️ Skipped game: delhi bazar - Today result is already WAIT or empty
+[2026-07-03 09:47:30] ✅ Reset all is_latest flags to 0
+[2026-07-03 09:47:30] ✅ Set is_latest = 1 for Disawar
+[2026-07-03 09:47:30] ===== CRON JOB COMPLETED =====
+[2026-07-03 09:47:30] Updated: 4 games, Skipped: 5 games
+[2026-07-03 09:47:30] 

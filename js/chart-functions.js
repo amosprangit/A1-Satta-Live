@@ -1,5 +1,21 @@
 // ============ CHART FUNCTIONS ============
 
+// Month names array for display
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 // Load chart data when check button is clicked
 function loadChartData() {
   const game = document.getElementById("chartGameSelect").value;
@@ -24,20 +40,6 @@ function loadChartData() {
     `;
 
   // Update title
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
   document.getElementById("chartTitle").textContent =
     game.toUpperCase() +
     " RESULT CHART FOR " +
@@ -45,7 +47,7 @@ function loadChartData() {
     " " +
     year;
 
-  // Fetch chart data - Updated endpoint and parameters
+  // Fetch chart data
   fetch("get-chart-data.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -85,7 +87,7 @@ function loadChartData() {
     });
 }
 
-// Render the chart table - Updated for new schema
+// Render the chart table
 function renderChartTable(data, game, year, month) {
   const display = document.getElementById("chartDataDisplay");
 
@@ -111,7 +113,7 @@ function renderChartTable(data, game, year, month) {
     return;
   }
 
-  // Calculate statistics - Updated to use 'result' field
+  // Calculate statistics
   const results = data.map((item) => parseInt(item.result) || 0);
   const validResults = results.filter((r) => r > 0);
   const max = validResults.length > 0 ? Math.max(...validResults) : 0;
@@ -120,8 +122,41 @@ function renderChartTable(data, game, year, month) {
   const avg =
     validResults.length > 0 ? (sum / validResults.length).toFixed(1) : 0;
 
-  // Build table - Updated to use chart_date and result
+  // Count occurrences of each number
+  const frequency = {};
+  validResults.forEach((r) => {
+    frequency[r] = (frequency[r] || 0) + 1;
+  });
+  const mostFrequent =
+    Object.keys(frequency).sort((a, b) => frequency[b] - frequency[a])[0] ||
+    "--";
+
+  // Build table
   let html = `
+        <!-- Statistics Summary -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 10px;">
+            <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666;">Total Results</div>
+                <div style="font-size: 20px; font-weight: bold; color: #1a1a2e;">${data.length}</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666;">Highest</div>
+                <div style="font-size: 20px; font-weight: bold; color: #28a745;">${max}</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666;">Lowest</div>
+                <div style="font-size: 20px; font-weight: bold; color: #dc3545;">${min}</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666;">Average</div>
+                <div style="font-size: 20px; font-weight: bold; color: #ffd700;">${avg}</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 11px; color: #666;">Most Frequent</div>
+                <div style="font-size: 20px; font-weight: bold; color: #c49a00;">${mostFrequent}</div>
+            </div>
+        </div>
+        
         <!-- Chart Table -->
         <div style="overflow-x: auto; background: #fff; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.08);">
             <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
@@ -136,14 +171,15 @@ function renderChartTable(data, game, year, month) {
 
   data.forEach((item, index) => {
     const rowColor = index % 2 === 0 ? "#f9f9f9" : "#ffffff";
-    // Parse date from YYYY-MM-DD format to DD-MM for display
     let displayDate = item.chart_date || item.date || "--";
+
     if (displayDate !== "--") {
       const parts = displayDate.split("-");
       if (parts.length === 3) {
         displayDate = parts[2] + "-" + parts[1];
       }
     }
+
     const resultNum = parseInt(item.result) || 0;
     const isHigh = resultNum > 50;
     const resultColor = isHigh ? "#28a745" : resultNum > 0 ? "#dc3545" : "#666";
@@ -157,7 +193,6 @@ function renderChartTable(data, game, year, month) {
                 </td>
                 <td style="padding: 12px 15px; text-align: center; font-size: 24px; font-weight: bold; color: ${resultColor};">
                     ${item.result || "--"}
-                    ${item.result ? (isHigh ? " " : resultNum > 0 ? " " : "") : ""}
                 </td>
             </tr>
         `;
@@ -172,36 +207,32 @@ function renderChartTable(data, game, year, month) {
             <div style="color: #666; font-size: 14px;">
                 📊 Showing ${data.length} entries for ${game.toUpperCase()}
             </div>
-            <button onclick="window.location.href='admin-dashboard.php?tab=chart'" style="
-                padding: 10px 25px;
-                background: #ffd700;
-                color: #000;
-                border: none;
-                border-radius: 40px;
-                font-weight: bold;
-                cursor: pointer;
-            ">⚙️ Manage Charts</button>
+            <div>
+                <button onclick="window.location.href='chart.php'" style="
+                    padding: 10px 25px;
+                    background: #6c757d;
+                    color: #fff;
+                    border: none;
+                    border-radius: 40px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    margin-right: 10px;
+                ">📅 View Full Chart</button>
+                <button onclick="window.location.href='admin-dashboard.php?tab=chart'" style="
+                    padding: 10px 25px;
+                    background: #ffd700;
+                    color: #000;
+                    border: none;
+                    border-radius: 40px;
+                    font-weight: bold;
+                    cursor: pointer;
+                ">⚙️ Manage Charts</button>
+            </div>
         </div>
     `;
 
   display.innerHTML = html;
 }
-
-// Month names array for display
-const monthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 // ============ PLAY TIME EDITOR FUNCTIONS ============
 
@@ -458,5 +489,14 @@ document.addEventListener("keydown", function (event) {
     if (modal.style.display === "flex") {
       closePlayTimeEditor();
     }
+  }
+});
+
+// Load on page load if game is selected
+document.addEventListener("DOMContentLoaded", function () {
+  // Auto-load chart if game is pre-selected
+  const gameSelect = document.getElementById("chartGameSelect");
+  if (gameSelect && gameSelect.value) {
+    // Don't auto-load, wait for user to click Check
   }
 });

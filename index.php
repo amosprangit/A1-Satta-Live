@@ -1,13 +1,23 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+// index.php - Clean Refactored Version
 header("Cache-Control: no-cache, no-store, must-revalidate");
 header("Pragma: no-cache");
 header("Expires: 0");
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-require_once 'config.php';
+require_once('config.php');
 
-// Set page title for header
+// Include helper functions
+require_once('includes/game-functions.php');
+require_once('includes/table-renderer.php');
+require_once('includes/disawar-functions.php');
+require_once('includes/live-box-functions.php');
+
+// Set page title
 $page_title = 'A1 satta live | Delhi Bazar Satta King 2026 Results';
 
 // Fetch website content
@@ -23,66 +33,30 @@ $telegram_link = getWebsiteContent($pdo, 'telegram_link') ?: 'https://t.me/a7Res
 $telegram_text = getWebsiteContent($pdo, 'telegram_text') ?: '"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."';
 $telegram_btn = getWebsiteContent($pdo, 'telegram_btn') ?: 'Click to Connect';
 
-// Fetch disawer result - Updated for new schema
-try {
-    $stmt = $pdo->prepare("SELECT * FROM game_results WHERE LOWER(game_name) = 'disawar' AND status = 1");
-    $stmt->execute();
-    $disawer = $stmt->fetch(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $disawer = false;
-}
+// Fetch Disawar Result
+$disawer = getDisawarResult($pdo);
 $disawer_result = $disawer['today_result'] ?? '86';
 $disawer_yesterday = $disawer['yesterday_result'] ?? '05';
 $disawer_display_name = $disawer['display_name'] ?? 'DISAWAR';
 $disawer_time = $disawer['result_time'] ?? '5:15 AM';
 
-// ===== FORCE FRESH DATA FROM DATABASE =====
+// Force fresh data
 $pdo->query("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
 
-// ============================================
-// FETCH ALL GAMES - FIXED
-// ============================================
-try {
-    // Force fresh query with status = 1 (active)
-    // Order by ID to match database order
-    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 1 ORDER BY id ASC");
-    $all_games_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch all games and categorize
+$allGames = fetchAllGames($pdo);
+$latestGame = getLatestGame($pdo, $disawer);
 
-    // Create lookup array and separate by table type
-    $all_results = [];
-    $table1_game_names = [];
-    $table2_game_names = [];
+// Get live game data
+$live_game_name = !empty($latestGame['display_name']) ? $latestGame['display_name'] : strtoupper($latestGame['game_name']);
+$live_result = $latestGame['today_result'] ?? 'WAIT';
+$live_yesterday = $latestGame['yesterday_result'] ?? '--';
+$live_time = $latestGame['result_time'] ?? '--';
 
-    // If there are games in database, use them
-    if (!empty($all_games_data)) {
-        foreach ($all_games_data as $game) {
-            // Use game_name as key (lowercase for consistency)
-            $key = strtolower($game['game_name']);
-            $all_results[$key] = $game;
-            if ($game['table_type'] == 'table2') {
-                $table2_game_names[] = $game['game_name'];
-            } else {
-                $table1_game_names[] = $game['game_name'];
-            }
-        }
-    }
-
-    // ONLY use fallback if NO games exist in database at all
-    if (empty($table1_game_names) && empty($table2_game_names)) {
-        $table1_game_names = ['pushkar', 'sadar_bazar', 'gwalior', 'delhi_bazar', 'shri_ganesh', 'gaziabad', 'gali'];
-        $table2_game_names = ['disawar', 'faridabad'];
-    }
-} catch (PDOException $e) {
-    error_log("Database error in index.php: " . $e->getMessage());
-    $table1_game_names = ['pushkar', 'sadar_bazar', 'gwalior', 'delhi_bazar', 'shri_ganesh', 'gaziabad', 'gali'];
-    $table2_game_names = ['disawar', 'faridabad'];
-    $all_results = [];
-}
-
-// Get table header display name
+// Table header display
 $table_header_display = 'सट्टा का नाम';
 
-// Fetch game timings dynamically
+// Fetch game timings
 try {
     $stmt = $pdo->query("SELECT * FROM game_timings WHERE is_active = 1 ORDER BY display_order, id");
     $game_timings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -90,7 +64,7 @@ try {
     $game_timings = [];
 }
 
-// Fetch game rates dynamically
+// Fetch game rates
 try {
     $stmt = $pdo->query("SELECT * FROM game_rates WHERE is_active = 1 ORDER BY display_order, id");
     $rates = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -98,7 +72,7 @@ try {
     $rates = [];
 }
 
-// Fetch all game names for chart selector - Updated for new schema
+// Fetch all game names for chart selector
 try {
     $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
     $all_game_names = $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -146,28 +120,9 @@ require_once 'header.php';
     </div>
 <?php endif; ?>
 
-<!-- Live Box -->
-<?php
-// Get the most recently updated game (for live box) - Updated for new schema
-try {
-    $stmt = $pdo->query("SELECT SQL_NO_CACHE * FROM game_results WHERE status = 1 AND is_latest = 1 ORDER BY id DESC LIMIT 1");
-    $latest_game = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // If no other game found, use disawar
-    if (!$latest_game) {
-        $latest_game = $disawer;
-    }
-} catch (PDOException $e) {
-    // If is_latest column doesn't exist, use disawar
-    $latest_game = $disawer;
-}
-
-$live_game_name = !empty($latest_game['display_name']) ? $latest_game['display_name'] : strtoupper($latest_game['game_name']);
-$live_result = $latest_game['today_result'] ?? 'WAIT';
-$live_yesterday = $latest_game['yesterday_result'] ?? '--';
-$live_time = $latest_game['result_time'] ?? '--';
-?>
-
+<!-- ============================================ -->
+<!-- LIVE BOX -->
+<!-- ============================================ -->
 <div class="live-box">
     <div id="clock" class="clock"></div>
     <h2>हा भाई यही आती हे सबसे पहले खबर रूको और देखो</h2>
@@ -183,15 +138,18 @@ $live_time = $latest_game['result_time'] ?? '--';
     </div>
 </div>
 
-<div class="highlight"><?php echo htmlspecialchars(strtolower($live_game_name)); ?></div>
-<div class="disawer-timing"><?php echo htmlspecialchars($live_time); ?></div>
+<!-- ============================================ -->
+<!-- DISAWAR BOX -->
+<!-- ============================================ -->
+<div class="highlight"><?php echo htmlspecialchars(strtolower($disawer_display_name)); ?></div>
+<div class="disawer-timing"><?php echo htmlspecialchars($disawer_time); ?></div>
 <div class="disawer-arrow">
-    <?php echo htmlspecialchars($live_yesterday); ?> ➡️
+    <?php echo htmlspecialchars($disawer_yesterday); ?> ➡️
     <?php
-    if ($live_result == 'WAIT' || $live_result == '-1' || empty($live_result)) {
+    if ($disawer_result == 'WAIT' || $disawer_result == '-1' || empty($disawer_result)) {
         echo 'WAIT';
     } else {
-        echo htmlspecialchars($live_result);
+        echo htmlspecialchars($disawer_result);
     }
     ?>
 </div>
@@ -299,116 +257,155 @@ $live_time = $latest_game['result_time'] ?? '--';
     </div>
 </div>
 
-<!-- TABLE 1 - Main Games (Dynamic) -->
-<div class="table-wrapper">
-    <table class="result-table">
-        <thead>
-            <tr>
-                <th><?php echo $table_header_display; ?></th>
-                <th>कल आया था</th>
-                <th>आज का रिज़ल्ट</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($table1_game_names as $game):
-                // Get data from all_results using lowercase key for consistency
-                $key = strtolower($game);
-                $data = isset($all_results[$key]) ? $all_results[$key] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
-                $display_name = !empty($data['display_name']) ? $data['display_name'] : strtoupper($game);
-                $is_wait = ($data['today_result'] == 'WAIT' || $data['today_result'] == '-1' || empty($data['today_result']));
-                ?>
-                <tr>
-                    <td class="game-name">
-                        <a
-                            href="game.php?game=<?php echo urlencode(strtolower(str_replace(' ', '-', $game))); ?>"><?php echo strtoupper(htmlspecialchars($display_name)); ?></a>
-                        <span class="game-time"><?php echo htmlspecialchars($data['result_time'] ?? '--'); ?></span>
-                    </td>
-                    <td class="yesterday-result"><?php echo htmlspecialchars($data['yesterday_result'] ?? '--'); ?></td>
-                    <td class="today-result">
-                        <?php if ($is_wait): ?>
-                            <span class="wait-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
-                                    fill="#d32f2f">
-                                    <path
-                                        d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
-                                    <path
-                                        d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
-                                </svg>
-                                WAIT
-                            </span>
-                        <?php else: ?>
-                            <span class="result-value"><?php echo htmlspecialchars($data['today_result']); ?></span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (empty($table1_game_names)): ?>
-                <tr>
-                    <td colspan="3" style="text-align: center; padding: 20px; color: #999;">No games available</td>
-                </tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
-</div>
+<!-- ============================================ -->
+<!-- TABLE 1 - Default Games -->
+<!-- ============================================ -->
+<?php
+// Get base URL dynamically
+$base_path = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+$base_url = $base_path . '/';
 
-<!-- TABLE 2 - Extra Games (Dynamic) -->
-<div class="table-wrapper">
-    <table class="result-table">
-        <thead>
-            <tr>
-                <th><?php echo $table_header_display; ?></th>
-                <th>कल आया था</th>
-                <th>आज का रिज़ल्ट</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($table2_game_names as $game):
-                // Get data from all_results using lowercase key for consistency
-                $key = strtolower($game);
-                $data = isset($all_results[$key]) ? $all_results[$key] : ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
-                $display_name = !empty($data['display_name']) ? $data['display_name'] : strtoupper($game);
-                $is_wait = ($data['today_result'] == 'WAIT' || $data['today_result'] == '-1' || empty($data['today_result']));
-                ?>
+$defaultGamesData = getDefaultGamesData($pdo);
+if (!empty($defaultGamesData)):
+    ?>
+    <div class="table-wrapper">
+        <table class="result-table">
+            <thead>
                 <tr>
-                    <td class="game-name">
-                        <a
-                            href="game.php?game=<?php echo urlencode(strtolower(str_replace(' ', '-', $game))); ?>"><?php echo strtoupper(htmlspecialchars($display_name)); ?></a>
-                        <span class="game-time"><?php echo htmlspecialchars($data['result_time'] ?? '--'); ?></span>
-                    </td>
-                    <td class="yesterday-result"><?php echo htmlspecialchars($data['yesterday_result'] ?? '--'); ?></td>
-                    <td class="today-result">
-                        <?php if ($is_wait): ?>
-                            <span class="wait-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
-                                    fill="#d32f2f">
-                                    <path
-                                        d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
-                                    <path
-                                        d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
-                                </svg>
-                                WAIT
-                            </span>
-                        <?php else: ?>
-                            <span class="result-value"><?php echo htmlspecialchars($data['today_result']); ?></span>
-                        <?php endif; ?>
-                    </td>
+                    <th><?php echo $table_header_display; ?></th>
+                    <th>कल आया था</th>
+                    <th>आज का रिज़ल्ट</th>
                 </tr>
-            <?php endforeach; ?>
-            <?php if (empty($table2_game_names)): ?>
-                <tr>
-                    <td colspan="3" style="text-align: center; padding: 20px; color: #999;">No games available</td>
-                </tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                <?php foreach ($defaultGamesData as $game):
+                    $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
+                    $is_wait = ($game['today_result'] == 'WAIT' || $game['today_result'] == '-1' || empty($game['today_result']));
+                    $game_slug = strtolower(str_replace(' ', '-', $game['game_name']));
+                    ?>
+                    <tr>
+                        <td class="game-name">
+                            <a href="<?php echo $base_url; ?>game.php?game=<?php echo urlencode($game_slug); ?>">
+                                <?php echo strtoupper(htmlspecialchars($display_name)); ?>
+                            </a>
+                            <span class="game-time"><?php echo htmlspecialchars($game['result_time'] ?? '--'); ?></span>
+                        </td>
+                        <td class="yesterday-result"><?php echo htmlspecialchars($game['yesterday_result'] ?? '--'); ?></td>
+                        <td class="today-result">
+                            <?php if ($is_wait): ?>
+                                <span class="wait-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
+                                        fill="#d32f2f">
+                                        <path
+                                            d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
+                                        <path
+                                            d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
+                                    </svg>
+                                    WAIT
+                                </span>
+                            <?php else: ?>
+                                <span class="result-value"><?php echo htmlspecialchars($game['today_result']); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
 
-<!-- Chart Selector - Dynamic -->
+<!-- ============================================ -->
+<!-- TABLE 2 - Custom Tables -->
+<!-- ============================================ -->
+<?php
+$customTables = getCustomTables($pdo);
+foreach ($customTables as $customTable):
+    $tableGames = getCustomTableGames($pdo, $customTable['id']);
+    if (empty($tableGames))
+        continue;
+    ?>
+    <div class="table-wrapper">
+        <table class="result-table">
+            <thead>
+                <tr>
+                    <th><?php echo $table_header_display; ?></th>
+                    <th>कल आया था</th>
+                    <th>आज का रिज़ल्ट</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($tableGames as $game):
+                    $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
+                    $is_wait = ($game['today_result'] == 'WAIT' || $game['today_result'] == '-1' || empty($game['today_result']));
+                    $game_slug = strtolower(str_replace(' ', '-', $game['game_name']));
+                    ?>
+                    <tr>
+                        <td class="game-name">
+                            <a href="<?php echo $base_url; ?>game.php?game=<?php echo urlencode($game_slug); ?>">
+                                <?php echo strtoupper(htmlspecialchars($display_name)); ?>
+                            </a>
+                            <span class="game-time"><?php echo htmlspecialchars($game['result_time'] ?? '--'); ?></span>
+                        </td>
+                        <td class="yesterday-result"><?php echo htmlspecialchars($game['yesterday_result'] ?? '--'); ?></td>
+                        <td class="today-result">
+                            <?php if ($is_wait): ?>
+                                <span class="wait-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
+                                        fill="#d32f2f">
+                                        <path
+                                            d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
+                                        <path
+                                            d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
+                                    </svg>
+                                    WAIT
+                                </span>
+                            <?php else: ?>
+                                <span class="result-value"><?php echo htmlspecialchars($game['today_result']); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endforeach; ?>
+<!-- Chart Selector -->
+<?php
+// Fetch all game names from both tables for chart selector
+try {
+    $all_game_names = [];
+
+    // Get regular games from game_results
+    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
+    $regularGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $all_game_names = array_merge($all_game_names, $regularGames);
+
+    // Get custom table games
+    $stmt = $pdo->query("
+        SELECT DISTINCT ctg.game_name 
+        FROM custom_table_games ctg
+        INNER JOIN custom_tables ct ON ctg.table_id = ct.id
+        WHERE ct.status = 1
+        ORDER BY ctg.game_name
+    ");
+    $customGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $all_game_names = array_merge($all_game_names, $customGames);
+
+    // Remove duplicates and sort
+    $all_game_names = array_unique($all_game_names);
+    sort($all_game_names);
+
+} catch (PDOException $e) {
+    error_log("Error fetching game names for chart: " . $e->getMessage());
+    $all_game_names = ['disawar', 'pushkar', 'sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
+}
+?>
 <div class="chart-selector">
     <select id="chartGameSelect">
         <option value="">-- Select Game --</option>
         <?php foreach ($all_game_names as $game): ?>
-            <option value="<?php echo htmlspecialchars($game); ?>"><?php echo strtoupper(htmlspecialchars($game)); ?>
+            <option value="<?php echo htmlspecialchars($game); ?>">
+                <?php echo strtoupper(htmlspecialchars($game)); ?>
             </option>
         <?php endforeach; ?>
     </select>
@@ -597,173 +594,7 @@ $live_time = $latest_game['result_time'] ?? '--';
         </div>
     </div>
 
-    <script>
-        // ============ TIMINGS CRUD ============
-        function openPlayTimeEditor() {
-            document.getElementById('playTimeEditorModal').style.display = 'flex';
-        }
-
-        function closePlayTimeEditor() {
-            document.getElementById('playTimeEditorModal').style.display = 'none';
-        }
-
-        function showPlayTimeTab(tab) {
-            document.getElementById('timingsTab').style.display = tab === 'timings' ? 'block' : 'none';
-            document.getElementById('ratesTab').style.display = tab === 'rates' ? 'block' : 'none';
-            document.getElementById('tabTimingsBtn').style.background = tab === 'timings' ? '#ffd700' : '#e0e0e0';
-            document.getElementById('tabRatesBtn').style.background = tab === 'rates' ? '#ffd700' : '#e0e0e0';
-        }
-
-        function addTiming() {
-            const game = document.getElementById('newTimingGame').value;
-            const time = document.getElementById('newTimingTime').value;
-            const emoji = document.getElementById('newTimingEmoji').value || '😇';
-
-            if (!game || !time) { alert('Please fill all fields'); return; }
-
-            fetch('ajax-handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=add_timing&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                });
-        }
-
-        function editTiming(id) {
-            const row = document.getElementById('timing-row-' + id);
-            const cells = row.querySelectorAll('td');
-            document.getElementById('editTimingId').value = id;
-            document.getElementById('editTimingGame').value = cells[1].innerText.trim();
-            document.getElementById('editTimingTime').value = cells[2].innerText.trim();
-            document.getElementById('editTimingEmoji').value = cells[0].innerText.trim();
-            document.getElementById('editTimingForm').style.display = 'block';
-            document.getElementById('editRateForm').style.display = 'none';
-        }
-
-        function updateTiming() {
-            const id = document.getElementById('editTimingId').value;
-            const game = document.getElementById('editTimingGame').value;
-            const time = document.getElementById('editTimingTime').value;
-            const emoji = document.getElementById('editTimingEmoji').value;
-
-            fetch('ajax-handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=update_timing&id=${id}&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                });
-        }
-
-        function deleteTiming(id) {
-            if (!confirm('Delete this timing?')) return;
-
-            fetch('ajax-handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=delete_timing&id=${id}`
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                });
-        }
-
-        function cancelEditTiming() {
-            document.getElementById('editTimingForm').style.display = 'none';
-        }
-
-        // ============ RATES CRUD ============
-        function addRate() {
-            const type = document.getElementById('newRateType').value;
-            const value = document.getElementById('newRateValue').value;
-
-            if (!type || !value) { alert('Please fill all fields'); return; }
-
-            fetch('ajax-handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=add_rate&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                });
-        }
-
-        function editRate(id) {
-            const row = document.getElementById('rate-row-' + id);
-            const cells = row.querySelectorAll('td');
-            document.getElementById('editRateId').value = id;
-            document.getElementById('editRateType').value = cells[0].innerText.trim();
-            document.getElementById('editRateValue').value = cells[1].innerText.trim();
-            document.getElementById('editRateForm').style.display = 'block';
-            document.getElementById('editTimingForm').style.display = 'none';
-        }
-
-        function updateRate() {
-            const id = document.getElementById('editRateId').value;
-            const type = document.getElementById('editRateType').value;
-            const value = document.getElementById('editRateValue').value;
-
-            fetch('ajax-handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=update_rate&id=${id}&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                });
-        }
-
-        function deleteRate(id) {
-            if (!confirm('Delete this rate?')) return;
-
-            fetch('ajax-handler.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `action=delete_rate&id=${id}`
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                });
-        }
-
-        function cancelEditRate() {
-            document.getElementById('editRateForm').style.display = 'none';
-        }
-    </script>
+    <script src="./js/index-funtions.js"></script>
 <?php endif; ?>
 
 <!-- Content Section -->
@@ -807,7 +638,7 @@ $live_time = $latest_game['result_time'] ?? '--';
     <h5><strong>What is DELHI BAZAR SATTA KING?</strong></h5>
     <p>The term satta king delhi bazar came from the game delhi bazar Satta which is quite popular game which named upon
         capital of India which is Delhi. and the word "bazar" means Market so the collected word will mean as Delhi
-        Market butin context to satta king , it means a game which have number from 0 to 99 where everyday at 3:15 one
+        Market but in context to satta king , it means a game which have number from 0 to 99 where everyday at 3:15 one
         number is announced by game owner which is unknown and players who had bid for same number will be rewarded with
         100 times of the bid amount and those who bid the wrong number will be loser and will have to loose their money
         so playing satta king delhi bajar is not quite easy as it have financial burden to end up loosing. Also keep in
@@ -850,19 +681,9 @@ $live_time = $latest_game['result_time'] ?? '--';
 </div>
 
 <div class="footer">
-    <a href="/privacy-policy">Privacy Policy</a>
-    <a href="/terms-and-conditions">Terms & Conditions</a>
-    <a href="/disclaimer">Disclaimer</a>
-    <p>© 2026 A1 satta live | All Rights Reserved</p>
+    <a href="privacy-policy.php">Privacy Policy</a>
+    <a href="terms-conditions.php">Terms & Conditions</a>
 </div>
-
-<div class="disclaimer">
-    !! DISCLAIMER - A1 satta live is a non-commercial informational website. Please view this site at your own risk, All
-    The Information Shown On Website Is Sponsored And We Warn You That satta matka Gambling/Satta May Be Banned Or
-    Illegal In Your Country. We Are Not Responsible For Any Issues Or Scam..., We Respect All Country Rules/Laws... If
-    You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
-</div>
-
 <script src="js/chart-functions.js"></script>
 
-<?
+<?php require_once 'footer.php'; ?>
