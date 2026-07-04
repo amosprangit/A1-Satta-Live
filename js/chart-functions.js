@@ -133,30 +133,6 @@ function renderChartTable(data, game, year, month) {
 
   // Build table
   let html = `
-        <!-- Statistics Summary -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 10px;">
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Total Results</div>
-                <div style="font-size: 20px; font-weight: bold; color: #1a1a2e;">${data.length}</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Highest</div>
-                <div style="font-size: 20px; font-weight: bold; color: #28a745;">${max}</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Lowest</div>
-                <div style="font-size: 20px; font-weight: bold; color: #dc3545;">${min}</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Average</div>
-                <div style="font-size: 20px; font-weight: bold; color: #ffd700;">${avg}</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 11px; color: #666;">Most Frequent</div>
-                <div style="font-size: 20px; font-weight: bold; color: #c49a00;">${mostFrequent}</div>
-            </div>
-        </div>
-        
         <!-- Chart Table -->
         <div style="overflow-x: auto; background: #fff; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.08);">
             <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
@@ -167,7 +143,7 @@ function renderChartTable(data, game, year, month) {
                     </tr>
                 </thead>
                 <tbody>
-    `;
+          `;
 
   data.forEach((item, index) => {
     const rowColor = index % 2 === 0 ? "#f9f9f9" : "#ffffff";
@@ -262,11 +238,10 @@ function showPlayTimeTab(tab) {
   }
 }
 
-// ============ TIMINGS CRUD ============
+// ============ TIMINGS CRUD (EMOJI REMOVED) ============
 function addTiming() {
   const game = document.getElementById("newTimingGame").value.trim();
   const time = document.getElementById("newTimingTime").value.trim();
-  const emoji = document.getElementById("newTimingEmoji").value.trim() || "😇";
 
   if (!game || !time) {
     alert("Please fill in all fields!");
@@ -276,7 +251,7 @@ function addTiming() {
   fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=add_timing&game=${encodeURIComponent(game)}&time=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`,
+    body: `action=add_timing&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -291,15 +266,19 @@ function addTiming() {
 
 function editTiming(id) {
   const row = document.getElementById("timing-row-" + id);
+  if (!row) {
+    console.error("Row not found for ID:", id);
+    return;
+  }
+
   const cells = row.querySelectorAll("td");
-  const emoji = cells[0].textContent.trim();
-  const game = cells[1].textContent.trim();
-  const time = cells[2].textContent.trim();
+  // cells[0] = Game Name, cells[1] = Timing (emoji removed)
+  const game = cells[0].textContent.trim();
+  const time = cells[1].textContent.trim();
 
   document.getElementById("editTimingId").value = id;
   document.getElementById("editTimingGame").value = game;
   document.getElementById("editTimingTime").value = time;
-  document.getElementById("editTimingEmoji").value = emoji;
   document.getElementById("editTimingForm").style.display = "block";
   document
     .getElementById("editTimingForm")
@@ -310,9 +289,8 @@ function updateTiming() {
   const id = document.getElementById("editTimingId").value;
   const game = document.getElementById("editTimingGame").value.trim();
   const time = document.getElementById("editTimingTime").value.trim();
-  const emoji = document.getElementById("editTimingEmoji").value.trim() || "😇";
 
-  if (!game || !time) {
+  if (!id || !game || !time) {
     alert("Please fill in all fields!");
     return;
   }
@@ -320,7 +298,7 @@ function updateTiming() {
   fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=update_timing&id=${id}&game=${encodeURIComponent(game)}&time=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`,
+    body: `action=update_timing&id=${id}&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -369,7 +347,7 @@ function addRate() {
   fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=add_rate&type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
+    body: `action=add_rate&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -384,6 +362,11 @@ function addRate() {
 
 function editRate(id) {
   const row = document.getElementById("rate-row-" + id);
+  if (!row) {
+    console.error("Row not found for ID:", id);
+    return;
+  }
+
   const cells = row.querySelectorAll("td");
   const type = cells[0].textContent.trim();
   const value = cells[1].textContent.trim();
@@ -402,7 +385,7 @@ function updateRate() {
   const type = document.getElementById("editRateType").value.trim();
   const value = document.getElementById("editRateValue").value.trim();
 
-  if (!type || !value) {
+  if (!id || !type || !value) {
     alert("Please fill in all fields!");
     return;
   }
@@ -410,7 +393,7 @@ function updateRate() {
   fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=update_rate&id=${id}&type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
+    body: `action=update_rate&id=${id}&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`,
   })
     .then((response) => response.json())
     .then((data) => {

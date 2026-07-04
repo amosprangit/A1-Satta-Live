@@ -26,7 +26,7 @@ function getAllGameNamesForAdmin($pdo)
         foreach ($regularGames as $game) {
             $allGames[] = [
                 'game_name' => $game['game_name'],
-                'display_name' => $game['display_name'] ?: strtoupper($game['game_name']),
+                'display_name' => !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']),
                 'source' => 'Main Table'
             ];
         }
@@ -47,17 +47,16 @@ function getAllGameNamesForAdmin($pdo)
         foreach ($customGames as $game) {
             $allGames[] = [
                 'game_name' => $game['game_name'],
-                'display_name' => $game['display_name'] ?: strtoupper($game['game_name']),
+                'display_name' => !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']),
                 'source' => $game['table_name']
             ];
         }
     } catch (PDOException $e) {
         error_log("Error fetching custom games: " . $e->getMessage());
     }
-
+    error_log("getAllGameNamesForAdmin found " . count($allGames) . " games");
     return $allGames;
 }
-
 function getDisawarData($pdo)
 {
     try {
@@ -210,7 +209,8 @@ function getWebsiteContentValue($pdo, $key, $default = '')
         return $default;
     }
 }
-function updateWebsiteContent($pdo, $key, $value) {
+function updateWebsiteContent($pdo, $key, $value)
+{
     try {
         $stmt = $pdo->prepare("INSERT INTO website_content (content_key, content_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE content_value = ?");
         return $stmt->execute([$key, $value, $value]);
@@ -219,7 +219,8 @@ function updateWebsiteContent($pdo, $key, $value) {
     }
 }
 
-function logoutAdmin() {
+function logoutAdmin()
+{
     session_destroy();
     header('Location: admin-login.php');
     exit();

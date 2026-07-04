@@ -5,12 +5,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $host = 'localhost';
-$dbname = 'a1satta_admin';
-$username = 'root';
-$password = 'password';
+$dbname = 'u736365304_a1sattatop';
+$username = 'u736365304_a1sattatop';
+$password = 'a1sattaTop';
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
     die("Connection failed: " . $e->getMessage());
@@ -472,4 +472,4 @@ function debugGameStatus($pdo)
     error_log("=========================");
     return $games;
 }
-?> 
+?>

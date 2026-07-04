@@ -1,11 +1,21 @@
 <?php
 // /admin/includes/admin-tabs.php
 
+// ============================================
+// RENDER GAMES TAB - FIXED (Removed duplicate)
+// ============================================
 function renderGamesTab($pdo, $all_games, $table1_games, $table2_games, $all_games_list = null)
 {
     // If $all_games_list is not provided, fetch it
     if ($all_games_list === null) {
         $all_games_list = getAllGameNamesForAdmin($pdo);
+    }
+
+    // Debug: Check if we have games
+    if (empty($all_games_list)) {
+        echo '<!-- Debug: No games found in getAllGameNamesForAdmin() -->';
+    } else {
+        echo '<!-- Debug: Found ' . count($all_games_list) . ' games in dropdown -->';
     }
 
     // Merge all games into one list for the table
@@ -21,6 +31,7 @@ function renderGamesTab($pdo, $all_games, $table1_games, $table2_games, $all_gam
                 <select name="game_name" id="selectGameName" required onchange="loadGameData(this.value)">
                     <option value="">-- Select Game --</option>
                     <?php
+                    // Loop through all games from both tables
                     foreach ($all_games_list as $game):
                         $is_custom = ($game['source'] !== 'Main Table');
                         ?>
@@ -32,6 +43,10 @@ function renderGamesTab($pdo, $all_games, $table1_games, $table2_games, $all_gam
                             <?php endif; ?>
                         </option>
                     <?php endforeach; ?>
+
+                    <?php if (empty($all_games_list)): ?>
+                        <option value="" disabled>No games found</option>
+                    <?php endif; ?>
                 </select>
             </div>
             <div class="form-group">
@@ -168,11 +183,14 @@ function renderGamesTab($pdo, $all_games, $table1_games, $table2_games, $all_gam
     </div>
     <?php
 }
+
 // ============================================
-// RENDER CHART TAB
+// RENDER CHART TAB - FIXED (Added getAllGameNamesForAdmin)
 // ============================================
 function renderChartTab($pdo, $edit_game, $edit_date, $edit_result, $chart_data_display)
 {
+    // FIXED: Use getAllGameNamesForAdmin instead of getGameNamesList
+    $all_games_list = getAllGameNamesForAdmin($pdo);
     ?>
     <?php if ($edit_game && $edit_date): ?>
         <div class="admin-section" style="border-left-color: #17a2b8; background: #f0f8ff;">
@@ -199,9 +217,10 @@ function renderChartTab($pdo, $edit_game, $edit_date, $edit_result, $chart_data_
             <div class="form-group"><label>Game Name:</label>
                 <select name="chart_game" required>
                     <option value="">-- Select Game --</option>
-                    <?php $all_games_list = getGameNamesList($pdo);
-                    foreach ($all_games_list as $game): ?>
-                        <option value="<?php echo $game; ?>"><?php echo ucfirst($game); ?></option>
+                    <?php foreach ($all_games_list as $game): ?>
+                        <option value="<?php echo htmlspecialchars($game['game_name']); ?>">
+                            <?php echo htmlspecialchars(ucfirst($game['display_name'])); ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -219,9 +238,10 @@ function renderChartTab($pdo, $edit_game, $edit_date, $edit_result, $chart_data_
             <div class="form-group"><label>Game Name:</label>
                 <select name="gen_chart_game" required>
                     <option value="">-- Select Game --</option>
-                    <?php $all_games_list = getGameNamesList($pdo);
-                    foreach ($all_games_list as $game): ?>
-                        <option value="<?php echo $game; ?>"><?php echo ucfirst($game); ?></option>
+                    <?php foreach ($all_games_list as $game): ?>
+                        <option value="<?php echo htmlspecialchars($game['game_name']); ?>">
+                            <?php echo htmlspecialchars(ucfirst($game['display_name'])); ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -311,8 +331,8 @@ function renderTimingsTab($pdo, $game_timings)
                     placeholder="e.g. disawer" required></div>
             <div class="form-group"><label>Time:</label><input type="text" name="timing_time" placeholder="e.g. 5:15 AM"
                     required></div>
-            <div class="form-group"><label>Emoji:</label><input type="text" name="timing_emoji" placeholder="😇" value="😇">
-            </div>
+            <!-- <div class="form-group"><label>Emoji:</label><input type="text" name="timing_emoji" placeholder="😇" value="😇">
+            </div> -->
             <button type="submit" class="btn-success">➕ Add Timing</button>
         </form>
 
@@ -323,7 +343,7 @@ function renderTimingsTab($pdo, $game_timings)
                         <th>ID</th>
                         <th>Game Name</th>
                         <th>Timing</th>
-                        <th>Emoji</th>
+                        <!-- <th>Emoji</th> -->
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -339,14 +359,14 @@ function renderTimingsTab($pdo, $game_timings)
                                 <td><?php echo $timing['id']; ?></td>
                                 <td><strong><?php echo ucfirst($timing['game_name']); ?></strong></td>
                                 <td><?php echo $timing['timing']; ?></td>
-                                <td style="font-size:24px;"><?php echo $timing['emoji']; ?></td>
+                                <!-- <td style="font-size:24px;"><?php echo $timing; ?></td> -->
                                 <td><span
                                         style="color: <?php echo $timing['is_active'] ? '#28a745' : '#dc3545'; ?>;"><?php echo $timing['is_active'] ? '✅ Active' : '❌ Inactive'; ?></span>
                                 </td>
                                 <td>
                                     <div class="actions-cell">
                                         <button class="btn-edit"
-                                            onclick="openTimingEditModal(<?php echo $timing['id']; ?>, '<?php echo $timing['game_name']; ?>', '<?php echo $timing['timing']; ?>', '<?php echo $timing['emoji']; ?>', <?php echo $timing['is_active']; ?>)">✏️
+                                            onclick="openTimingEditModal(<?php echo $timing['id']; ?>, '<?php echo $timing['game_name']; ?>', '<?php echo $timing['timing']; ?>', '<?php echo $timing; ?>', <?php echo $timing['is_active']; ?>)">✏️
                                             Edit</button>
                                         <a href="?toggle_timing=<?php echo $timing['id']; ?>"
                                             class="btn-toggle <?php echo $timing['is_active'] ? 'active' : ''; ?>">🔄 Toggle</a>

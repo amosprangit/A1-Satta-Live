@@ -1,7 +1,5 @@
 <?php
-// /admin/ajax/get-game-info.php
-
-require_once __DIR__ . '/../includes/admin-functions.php';
+require_once './admin-functions.php';
 
 // Get game name from URL
 $game_name = isset($_GET['game']) ? trim($_GET['game']) : '';
@@ -20,7 +18,7 @@ try {
     $stmt->execute([$game_name]);
     $game_data = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($game_data) {
-        $source = 'game_results';
+        $source = 'Main Table';
     }
 } catch (PDOException $e) {
     error_log("Error fetching from game_results: " . $e->getMessage());
@@ -29,11 +27,15 @@ try {
 // SECOND: If not found, check custom_table_games
 if (!$game_data) {
     try {
-        $stmt = $pdo->prepare("SELECT display_name, today_result, yesterday_result, result_time FROM custom_table_games WHERE LOWER(game_name) = LOWER(?)");
+        $stmt = $pdo->prepare("SELECT display_name, today_result, yesterday_result, result_time, table_id FROM custom_table_games WHERE LOWER(game_name) = LOWER(?)");
         $stmt->execute([$game_name]);
         $game_data = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($game_data) {
-            $source = 'custom_table_games';
+            // Get the table name
+            $stmt2 = $pdo->prepare("SELECT table_name FROM custom_tables WHERE id = ?");
+            $stmt2->execute([$game_data['table_id']]);
+            $table_info = $stmt2->fetch(PDO::FETCH_ASSOC);
+            $source = $table_info['table_name'] ?? 'Custom Table';
         }
     } catch (PDOException $e) {
         error_log("Error fetching from custom_table_games: " . $e->getMessage());

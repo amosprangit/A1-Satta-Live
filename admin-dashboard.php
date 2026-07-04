@@ -1,8 +1,16 @@
 <?php
 // /admin/admin-dashboard.php - Main Admin Dashboard
 
+// Enable error reporting
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// FIXED: config.php is one level up
 require_once 'config.php';
-require_once __DIR__ . './admin/admin-functions.php';
+
+// FIXED: These files are in the same directory
+require_once './admin/admin-functions.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -11,7 +19,7 @@ if (!isAdminLoggedIn()) {
 }
 
 // Process all POST/GET handlers
-require_once __DIR__ . './admin/admin-handlers.php';
+require_once './admin/admin-handlers.php';
 
 $page_title = 'Admin Dashboard - A1 Satta Live';
 $current_tab = getCurrentTab();
@@ -26,7 +34,7 @@ $edit_result = $_GET['edit_result'] ?? '';
 // ============================================
 
 // Fetch Disawar data
-$disawer = getDisawarData($pdo);
+// $disawer = getDisawarData($pdo);
 
 // Fetch all games data
 $gameData = getAllGameData($pdo);
@@ -54,6 +62,7 @@ $stats = getStats($pdo);
 // Get all games for dropdown (includes custom tables)
 $all_games_list = getAllGameNamesForAdmin($pdo);
 
+// FIXED: header.php is one level up
 require_once 'header.php';
 ?>
 
@@ -122,8 +131,8 @@ require_once 'header.php';
 
     <!-- Tab Contents -->
     <div id="tab-games" class="tab-content <?php echo $current_tab === 'games' ? 'active' : ''; ?>">
-        <?php require_once __DIR__ . './admin/admin-tabs.php';
-        renderGamesTab($pdo, $all_games, $table1_games, $table2_games, $all_games_list); ?>
+        <?php require_once './admin/admin-tabs.php'; ?>
+        <?php renderGamesTab($pdo, $all_games, $table1_games, $table2_games, $all_games_list); ?>
     </div>
 
     <div id="tab-chart" class="tab-content <?php echo $current_tab === 'chart' ? 'active' : ''; ?>">
@@ -148,7 +157,7 @@ require_once 'header.php';
 </div>
 
 <!-- Modals -->
-<?php require_once __DIR__ . './admin/admin-models.php';
+<?php require_once './admin/admin-models.php';
 renderModals(); ?>
 
 <!-- JavaScript - Include the external JS file -->

@@ -6,9 +6,6 @@ error_reporting(E_ALL);
 header("Cache-Control: no-cache, no-store, must-revalidate");
 header("Pragma: no-cache");
 header("Expires: 0");
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 require_once('config.php');
 
 // Include helper functions
@@ -21,8 +18,8 @@ require_once('includes/live-box-functions.php');
 $page_title = 'A1 satta live | Delhi Bazar Satta King 2026 Results';
 
 // Fetch website content
-$khaiwal_line1 = getWebsiteContent($pdo, 'khaiwal_line1') ?: '🔰 *Online khaiwal* 🔰';
-$khaiwal_line2 = getWebsiteContent($pdo, 'khaiwal_line2') ?: '*( Raj Bhai Khaiwal )*';
+$khaiwal_line1 = getWebsiteContent($pdo, 'khaiwal_line1') ?: '🔰 Online khaiwal 🔰';
+$khaiwal_line2 = getWebsiteContent($pdo, 'khaiwal_line2') ?: '( Raj Bhai Khaiwal )';
 $whatsapp_number = getWebsiteContent($pdo, 'whatsapp_number') ?: '919812287328';
 $whatsapp_text = getWebsiteContent($pdo, 'whatsapp_text') ?: 'WhatsApp';
 $whatsapp_subtext = getWebsiteContent($pdo, 'whatsapp_subtext') ?: 'Click to Chat';
@@ -72,12 +69,96 @@ try {
     $rates = [];
 }
 
-// Fetch all game names for chart selector
+// ============================================
+// FETCH ALL GAMES FOR CHART SELECTOR
+// ============================================
+$all_game_names = [];
+
 try {
+    // Get regular games from game_results
     $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
-    $all_game_names = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $regularGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $all_game_names = array_merge($all_game_names, $regularGames);
 } catch (PDOException $e) {
-    $all_game_names = array_merge(['disawar'], $table1_game_names, $table2_game_names);
+    error_log("Error fetching regular games: " . $e->getMessage());
+}
+
+try {
+    // Get custom table games
+    $stmt = $pdo->query("
+        SELECT DISTINCT ctg.game_name 
+        FROM custom_table_games ctg
+        INNER JOIN custom_tables ct ON ctg.table_id = ct.id
+        WHERE ct.status = 1
+        ORDER BY ctg.game_name
+    ");
+    $customGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $all_game_names = array_merge($all_game_names, $customGames);
+} catch (PDOException $e) {
+    error_log("Error fetching custom games: " . $e->getMessage());
+}
+
+// Remove duplicates and sort
+$all_game_names = array_unique($all_game_names);
+sort($all_game_names);
+
+// ============================================
+// FETCH ALL GAMES FOR TABLE DISPLAY
+// ============================================
+// Define the custom order based on time
+$customOrder = [
+    'pushkar' => 1,
+    'sadar bazar' => 2,
+    'gwalior' => 3,
+    'delhi bazar' => 4,
+    'shri ganesh' => 5,
+    'aligarh' => 6,
+    'faridabad' => 7,
+    'vrindavan' => 8,
+    'gaziabad' => 9,
+    'uttarkashi' => 10,
+    'gali' => 11
+];
+
+// Build CASE statement for custom ordering
+$caseStatement = "CASE LOWER(game_name) ";
+foreach ($customOrder as $game => $order) {
+    $caseStatement .= "WHEN '$game' THEN $order ";
+}
+$caseStatement .= "ELSE 999 END";
+
+// Fetch ALL games from database dynamically (excluding Disawar)
+try {
+    $sql = "SELECT * FROM game_results 
+            WHERE status = 1 AND LOWER(game_name) != 'disawar' 
+            ORDER BY $caseStatement, game_name ASC";
+    $stmt = $pdo->query($sql);
+    $allGamesData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // If no games found, use default games as fallback (excluding disawar)
+    if (empty($allGamesData)) {
+        $defaultGames = getDefaultGamesData($pdo);
+        $allGamesData = array_filter($defaultGames, function ($game) {
+            return strtolower($game['game_name']) !== 'disawar';
+        });
+        // Sort default games by custom order
+        usort($allGamesData, function ($a, $b) use ($customOrder) {
+            $orderA = $customOrder[strtolower($a['game_name'])] ?? 999;
+            $orderB = $customOrder[strtolower($b['game_name'])] ?? 999;
+            return $orderA - $orderB;
+        });
+    }
+} catch (PDOException $e) {
+    error_log("Error fetching games: " . $e->getMessage());
+    $defaultGames = getDefaultGamesData($pdo);
+    $allGamesData = array_filter($defaultGames, function ($game) {
+        return strtolower($game['game_name']) !== 'disawar';
+    });
+    usort($allGamesData, function ($a, $b) use ($customOrder) {
+        $orderA = $customOrder[strtolower($a['game_name'])] ?? 999;
+        $orderB = $customOrder[strtolower($b['game_name'])] ?? 999;
+        return $orderA - $orderB;
+    });
 }
 
 // Fetch all game timings for admin editor
@@ -180,7 +261,9 @@ require_once 'header.php';
     </div>
 </div>
 
-<!-- Game Timings -->
+<!-- ============================================ -->
+<!-- GAME TIMINGS - EMOJI REMOVED -->
+<!-- ============================================ -->
 <div id="play-time-info" style="position: relative;">
     <?php if (isAdminLoggedIn()): ?>
         <button onclick="openPlayTimeEditor()" style="
@@ -208,29 +291,28 @@ require_once 'header.php';
     <p><?php echo htmlspecialchars($khaiwal_line1); ?></p>
     <p><?php echo htmlspecialchars($khaiwal_line2); ?></p>
     <p>🎊🎊🎊🎊🎊</p>
-    <p>🔰 *All game timing* 🔰</p>
+    <p>🔰 All game timing 🔰</p>
 
     <div id="timings-container">
         <?php foreach ($game_timings as $timing): ?>
             <p data-timing-id="<?php echo $timing['id']; ?>">
-                <?php echo htmlspecialchars($timing['emoji']); ?>
-                *<?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?>...
-                <?php echo htmlspecialchars($timing['timing']); ?>*
+                <?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?>...
+                <?php echo htmlspecialchars($timing['timing']); ?>
             </p>
         <?php endforeach; ?>
         <?php if (empty($game_timings)): ?>
-            <p>😇 *Disawar... 5:15 AM*</p>
-            <p>😇 *Gali... 11:15 PM*</p>
+            <p>*Disawar... 5:15 AM*</p>
+            <p>*Gali... 11:15 PM*</p>
         <?php endif; ?>
     </div>
 
-    <p>*फोन पे, गूगल पे=* *scanner*</p>
+    <p>*फोन पे, गूगल पे= *scanner*</p>
     <p>*Rate list* *राधे राधे*</p>
 
     <div id="rates-container">
         <?php foreach ($rates as $rate): ?>
             <p data-rate-id="<?php echo $rate['id']; ?>">
-                *<?php echo htmlspecialchars($rate['rate_type']); ?>=<?php echo htmlspecialchars($rate['rate_value']); ?>*
+                <?php echo htmlspecialchars($rate['rate_type']); ?>=<?php echo htmlspecialchars($rate['rate_value']); ?>*
             </p>
         <?php endforeach; ?>
         <?php if (empty($rates)): ?>
@@ -258,15 +340,14 @@ require_once 'header.php';
 </div>
 
 <!-- ============================================ -->
-<!-- TABLE 1 - Default Games -->
+<!-- TABLE 1 - All Games (Dynamic from Database) -->
 <!-- ============================================ -->
 <?php
 // Get base URL dynamically
 $base_path = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $base_url = $base_path . '/';
 
-$defaultGamesData = getDefaultGamesData($pdo);
-if (!empty($defaultGamesData)):
+if (!empty($allGamesData)):
     ?>
     <div class="table-wrapper">
         <table class="result-table">
@@ -278,7 +359,7 @@ if (!empty($defaultGamesData)):
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($defaultGamesData as $game):
+                <?php foreach ($allGamesData as $game):
                     $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
                     $is_wait = ($game['today_result'] == 'WAIT' || $game['today_result'] == '-1' || empty($game['today_result']));
                     $game_slug = strtolower(str_replace(' ', '-', $game['game_name']));
@@ -369,41 +450,20 @@ foreach ($customTables as $customTable):
         </table>
     </div>
 <?php endforeach; ?>
-<!-- Chart Selector -->
-<?php
-// Fetch all game names from both tables for chart selector
-try {
-    $all_game_names = [];
 
-    // Get regular games from game_results
-    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
-    $regularGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    $all_game_names = array_merge($all_game_names, $regularGames);
-
-    // Get custom table games
-    $stmt = $pdo->query("
-        SELECT DISTINCT ctg.game_name 
-        FROM custom_table_games ctg
-        INNER JOIN custom_tables ct ON ctg.table_id = ct.id
-        WHERE ct.status = 1
-        ORDER BY ctg.game_name
-    ");
-    $customGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    $all_game_names = array_merge($all_game_names, $customGames);
-
-    // Remove duplicates and sort
-    $all_game_names = array_unique($all_game_names);
-    sort($all_game_names);
-
-} catch (PDOException $e) {
-    error_log("Error fetching game names for chart: " . $e->getMessage());
-    $all_game_names = ['disawar', 'pushkar', 'sadar bazar', 'gwalior', 'delhi bazar', 'shri ganesh', 'faridabad', 'gaziabad', 'gali'];
-}
-?>
+<!-- ============================================ -->
+<!-- CHART SELECTOR -->
+<!-- ============================================ -->
 <div class="chart-selector">
     <select id="chartGameSelect">
         <option value="">-- Select Game --</option>
-        <?php foreach ($all_game_names as $game): ?>
+        <?php
+        // Loop through ALL game names fetched from both tables
+        foreach ($all_game_names as $game):
+            // Skip empty values
+            if (empty($game))
+                continue;
+            ?>
             <option value="<?php echo htmlspecialchars($game); ?>">
                 <?php echo strtoupper(htmlspecialchars($game)); ?>
             </option>
@@ -444,7 +504,9 @@ try {
     </div>
 </div>
 
-<!-- Play Time Editor Modal - Admin Only -->
+<!-- ============================================ -->
+<!-- PLAY TIME EDITOR MODAL - EMOJI REMOVED -->
+<!-- ============================================ -->
 <?php if (isAdminLoggedIn()): ?>
     <div id="playTimeEditorModal"
         style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
@@ -473,8 +535,6 @@ try {
                             style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <input type="text" id="newTimingTime" placeholder="Time (e.g. 5:15 AM)"
                             style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
-                        <input type="text" id="newTimingEmoji" placeholder="Emoji (e.g. 😇)"
-                            style="flex: 0 0 80px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <button type="button" onclick="addTiming()"
                             style="padding: 10px 25px; background: #28a745; color: #fff; border: none; border-radius: 40px; font-weight: bold; cursor: pointer;">➕
                             Add</button>
@@ -485,7 +545,6 @@ try {
                     <table style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr style="background: #1a1a2e; color: #ffd700;">
-                                <th style="padding: 10px; text-align: left;">Emoji</th>
                                 <th style="padding: 10px; text-align: left;">Game</th>
                                 <th style="padding: 10px; text-align: left;">Timing</th>
                                 <th style="padding: 10px; text-align: center;">Actions</th>
@@ -494,8 +553,6 @@ try {
                         <tbody id="timingsList">
                             <?php foreach ($all_game_timings as $timing): ?>
                                 <tr id="timing-row-<?php echo $timing['id']; ?>" style="border-bottom: 1px solid #eee;">
-                                    <td style="padding: 8px; font-size: 24px;"><?php echo htmlspecialchars($timing['emoji']); ?>
-                                    </td>
                                     <td style="padding: 8px;">
                                         <strong><?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?></strong>
                                     </td>
@@ -565,8 +622,6 @@ try {
                         style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
                     <input type="text" id="editTimingTime" placeholder="Time"
                         style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
-                    <input type="text" id="editTimingEmoji" placeholder="Emoji"
-                        style="flex: 0 0 80px; padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
                     <button onclick="updateTiming()"
                         style="padding: 10px 25px; background: #ffd700; border: none; border-radius: 40px; font-weight: bold; cursor: pointer;">💾
                         Update</button>
