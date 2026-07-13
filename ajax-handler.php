@@ -1,9 +1,8 @@
 <?php
-// ajax-handler.php
+// /var/www/html/ajax-handler.php
 
 // Enable error reporting for debugging
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 // Start session if not started
@@ -27,10 +26,9 @@ $action = $_POST['action'] ?? '';
 try {
     switch ($action) {
         // ============================================
-        // TIMING OPERATIONS - FIXED
+        // TIMING OPERATIONS
         // ============================================
         case 'add_timing':
-            // Accept both parameter names
             $game = $_POST['game_name'] ?? $_POST['game'] ?? '';
             $time = $_POST['timing'] ?? $_POST['time'] ?? '';
             $emoji = $_POST['emoji'] ?? '😇';
@@ -39,11 +37,14 @@ try {
                 throw new Exception('Game name and time are required');
             }
 
-            // Insert directly using PDO
             $stmt = $pdo->prepare("INSERT INTO game_timings (game_name, timing, emoji, is_active) VALUES (?, ?, ?, 1)");
             $result = $stmt->execute([$game, $time, $emoji]);
 
-            echo json_encode(['success' => $result, 'message' => 'Timing added successfully']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Timing added successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to add timing']);
+            }
             break;
 
         case 'update_timing':
@@ -59,7 +60,11 @@ try {
             $stmt = $pdo->prepare("UPDATE game_timings SET game_name = ?, timing = ?, emoji = ? WHERE id = ?");
             $result = $stmt->execute([$game, $time, $emoji, $id]);
 
-            echo json_encode(['success' => $result, 'message' => 'Timing updated successfully']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Timing updated successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update timing']);
+            }
             break;
 
         case 'delete_timing':
@@ -72,11 +77,15 @@ try {
             $stmt = $pdo->prepare("DELETE FROM game_timings WHERE id = ?");
             $result = $stmt->execute([$id]);
 
-            echo json_encode(['success' => $result, 'message' => 'Timing deleted successfully']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Timing deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete timing']);
+            }
             break;
 
         // ============================================
-        // RATE OPERATIONS - FIXED
+        // RATE OPERATIONS
         // ============================================
         case 'add_rate':
             $type = $_POST['rate_type'] ?? $_POST['type'] ?? '';
@@ -89,7 +98,11 @@ try {
             $stmt = $pdo->prepare("INSERT INTO game_rates (rate_type, rate_value, is_active) VALUES (?, ?, 1)");
             $result = $stmt->execute([$type, $value]);
 
-            echo json_encode(['success' => $result, 'message' => 'Rate added successfully']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Rate added successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to add rate']);
+            }
             break;
 
         case 'update_rate':
@@ -104,7 +117,11 @@ try {
             $stmt = $pdo->prepare("UPDATE game_rates SET rate_type = ?, rate_value = ? WHERE id = ?");
             $result = $stmt->execute([$type, $value, $id]);
 
-            echo json_encode(['success' => $result, 'message' => 'Rate updated successfully']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Rate updated successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update rate']);
+            }
             break;
 
         case 'delete_rate':
@@ -117,7 +134,11 @@ try {
             $stmt = $pdo->prepare("DELETE FROM game_rates WHERE id = ?");
             $result = $stmt->execute([$id]);
 
-            echo json_encode(['success' => $result, 'message' => 'Rate deleted successfully']);
+            if ($result) {
+                echo json_encode(['success' => true, 'message' => 'Rate deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete rate']);
+            }
             break;
 
         default:

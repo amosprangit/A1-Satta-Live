@@ -1,3 +1,8 @@
+body {
+  font-family:
+    "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", Arial, sans-serif;
+}
+
 .highlight {
   background: #ffd700;
   color: #000;
@@ -135,31 +140,91 @@
 }
 
 #play-time-info {
-  margin-top: 20px;
-  background: #ffd700;
+  position: relative;
+  width: 95%;
+  max-width: 1300px;
+  margin: 20px auto;
+  padding: 25px 20px;
+
+  background: linear-gradient(to bottom, #ffd700 0%, #f8e56b 40%, #ffffff 100%);
+
+  border-radius: 20px;
   text-align: center;
-  margin-left: 16px;
-  border-radius: 16px;
-  border: 3px dotted red;
-  padding: 8px;
-  font-size: 16px;
-  font-weight: 700;
-  width: 30%;
-  display: grid;
-  place-content: center;
-  place-items: center;
+
+  font-size: 18px;
+  font-weight: 600;
+
+  color: #111;
+  box-sizing: border-box;
+
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
-#play-time-info p {
-  padding: 2px;
+#play-time-info .main-title {
+  font-size: 38px;
+  font-weight: 800;
+  color: #1a1a2e;
+  margin-bottom: 15px;
+}
+
+#play-time-info .sub-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+#play-time-info a {
+  text-decoration: none;
 }
 
 #play-time-info a div {
-  background: #1da851;
-  border-radius: 100%;
-  color: black;
-  text-align: center;
-  padding: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+
+  background: #00c851;
+  color: white;
+
+  padding: 14px 28px;
+
+  border-radius: 50px;
+
+  margin-top: 20px;
+
+  font-size: 20px;
+  font-weight: bold;
+
+  transition: 0.3s ease;
+}
+
+#play-time-info a div:hover {
+  transform: translateY(-2px);
+}
+
+/* .whatsapp-button {
+
+width: fit-content;
+} */
+.whatsapp-button {
+  background: #00c853;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 25px;
+  border-radius: 50px;
+  font-size: 18px;
+  margin-top: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+}
+
+.whatsapp-button p {
+  margin: 0;
+  display: inline;
 }
 
 .result-table {
@@ -438,6 +503,21 @@
 
   .notification-card h2 {
     font-size: 16px;
+  }
+
+  #play-time-info {
+    width: 95%;
+    padding: 20px 15px;
+    font-size: 15px;
+  }
+
+  #play-time-info p {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  #play-time-info .main-title {
+    font-size: 28px;
   }
 }
 

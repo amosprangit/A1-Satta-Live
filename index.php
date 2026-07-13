@@ -1,31 +1,188 @@
 <?php
-require_once 'config.php';
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+// index.php - Clean Refactored Version
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+require_once('config.php');
 
-// Set page title for header
+// Include helper functions
+require_once('includes/game-functions.php');
+require_once('includes/table-renderer.php');
+require_once('includes/disawar-functions.php');
+require_once('includes/live-box-functions.php');
+
+// Set page title
 $page_title = 'A1 satta live | Delhi Bazar Satta King 2026 Results';
 
-// Define games in order
-$table1_game_names = ['sadar bazar', 'gwalior', 'delhi bazar', 'delhi matka', 'shri ganesh', 'agra', 'faridabad', 'alwar', 'gaziabad', 'dwarka', 'gali'];
-$table2_game_names = ['hr satta', 'kkr city', 'madhupuri', 'ujjala super', 'karol bagh', 'anmol bazar', 'sky king', 'delhi darbar', 'new ganga', 'fatehabad', 'raj shree', 'mandi bazar', 'bhadra bazar', 'sialkot', 'lion bazar', 'gaziabad king', 'dehradun city', 'daman'];
+// Fetch website content
+$khaiwal_line1 = getWebsiteContent($pdo, 'khaiwal_line1') ?: '🔰 Online khaiwal 🔰';
+$khaiwal_line2 = getWebsiteContent($pdo, 'khaiwal_line2') ?: '( Raj Bhai Khaiwal )';
+$whatsapp_number = getWebsiteContent($pdo, 'whatsapp_number') ?: '919812287328';
+$whatsapp_text = getWebsiteContent($pdo, 'whatsapp_text') ?: 'WhatsApp';
+$whatsapp_subtext = getWebsiteContent($pdo, 'whatsapp_subtext') ?: 'Click to Chat';
+$top_whatsapp_number = getWebsiteContent($pdo, 'top_whatsapp_number') ?: '919812287328';
+$top_whatsapp_text = getWebsiteContent($pdo, 'top_whatsapp_text') ?: '"NOW WHATSAPP PLAYERS CAN ALSO JOIN OUR WHATSAPP CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."';
+$top_whatsapp_btn = getWebsiteContent($pdo, 'top_whatsapp_btn') ?: 'Click to chat';
+$telegram_link = getWebsiteContent($pdo, 'telegram_link') ?: 'https://t.me/a7Resultupdates';
+$telegram_text = getWebsiteContent($pdo, 'telegram_text') ?: '"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND RECEIVE SUPERFAST RESULTS."';
+$telegram_btn = getWebsiteContent($pdo, 'telegram_btn') ?: 'Click to Connect';
 
-// Fetch disawer result
-$disawer = getGameResults($pdo, 'disawer');
-$disawer_result = $disawer ? $disawer['today_result'] : '86';
-$disawer_yesterday = $disawer ? $disawer['yesterday_result'] : '05';
+// Fetch Disawar Result
+$disawer = getDisawarResult($pdo);
+$disawer_result = $disawer['today_result'] ?? '86';
+$disawer_yesterday = $disawer['yesterday_result'] ?? '05';
+$disawer_display_name = $disawer['display_name'] ?? 'DISAWAR';
+$disawer_time = $disawer['result_time'] ?? '5:15 AM';
 
-// Fetch all game results
-$all_results = getAllGames($pdo);
+// Force fresh data
+$pdo->query("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED");
 
-// Get table header display name
+// Fetch all games and categorize
+$allGames = fetchAllGames($pdo);
+$latestGame = getLatestGame($pdo, $disawer);
+
+// Get live game data
+$live_game_name = !empty($latestGame['display_name']) ? $latestGame['display_name'] : strtoupper($latestGame['game_name']);
+$live_result = $latestGame['today_result'] ?? 'WAIT';
+$live_yesterday = $latestGame['yesterday_result'] ?? '--';
+$live_time = $latestGame['result_time'] ?? '--';
+
+// Table header display
 $table_header_display = 'सट्टा का नाम';
 
-// Get game timings for display
-$game_timings = getGameTimings($pdo);
+// Fetch game timings
+try {
+    $stmt = $pdo->query("SELECT * FROM game_timings WHERE is_active = 1 ORDER BY display_order, id");
+    $game_timings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $game_timings = [];
+}
+
+// Fetch game rates
+try {
+    $stmt = $pdo->query("SELECT * FROM game_rates WHERE is_active = 1 ORDER BY display_order, id");
+    $rates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $rates = [];
+}
+
+// ============================================
+// FETCH ALL GAMES FOR CHART SELECTOR
+// ============================================
+$all_game_names = [];
+
+try {
+    // Get regular games from game_results
+    $stmt = $pdo->query("SELECT DISTINCT game_name FROM game_results WHERE status = 1 ORDER BY game_name");
+    $regularGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $all_game_names = array_merge($all_game_names, $regularGames);
+} catch (PDOException $e) {
+    error_log("Error fetching regular games: " . $e->getMessage());
+}
+
+try {
+    // Get custom table games
+    $stmt = $pdo->query("
+        SELECT DISTINCT ctg.game_name 
+        FROM custom_table_games ctg
+        INNER JOIN custom_tables ct ON ctg.table_id = ct.id
+        WHERE ct.status = 1
+        ORDER BY ctg.game_name
+    ");
+    $customGames = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $all_game_names = array_merge($all_game_names, $customGames);
+} catch (PDOException $e) {
+    error_log("Error fetching custom games: " . $e->getMessage());
+}
+
+// Remove duplicates and sort
+$all_game_names = array_unique($all_game_names);
+sort($all_game_names);
+
+// ============================================
+// FETCH ALL GAMES FOR TABLE DISPLAY
+// ============================================
+// Define the custom order based on time
+$customOrder = [
+    'pushkar' => 1,
+    'sadar bazar' => 2,
+    'gwalior' => 3,
+    'delhi bazar' => 4,
+    'shri ganesh' => 5,
+    'aligarh' => 6,
+    'faridabad' => 7,
+    'vrindavan' => 8,
+    'gaziabad' => 9,
+    'uttarkashi' => 10,
+    'gali' => 11
+];
+
+// Build CASE statement for custom ordering
+$caseStatement = "CASE LOWER(game_name) ";
+foreach ($customOrder as $game => $order) {
+    $caseStatement .= "WHEN '$game' THEN $order ";
+}
+$caseStatement .= "ELSE 999 END";
+
+// Fetch ALL games from database dynamically (excluding Disawar)
+try {
+    $sql = "SELECT * FROM game_results 
+            WHERE status = 1 AND LOWER(game_name) != 'disawar' 
+            ORDER BY $caseStatement, game_name ASC";
+    $stmt = $pdo->query($sql);
+    $allGamesData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // If no games found, use default games as fallback (excluding disawar)
+    if (empty($allGamesData)) {
+        $defaultGames = getDefaultGamesData($pdo);
+        $allGamesData = array_filter($defaultGames, function ($game) {
+            return strtolower($game['game_name']) !== 'disawar';
+        });
+        // Sort default games by custom order
+        usort($allGamesData, function ($a, $b) use ($customOrder) {
+            $orderA = $customOrder[strtolower($a['game_name'])] ?? 999;
+            $orderB = $customOrder[strtolower($b['game_name'])] ?? 999;
+            return $orderA - $orderB;
+        });
+    }
+} catch (PDOException $e) {
+    error_log("Error fetching games: " . $e->getMessage());
+    $defaultGames = getDefaultGamesData($pdo);
+    $allGamesData = array_filter($defaultGames, function ($game) {
+        return strtolower($game['game_name']) !== 'disawar';
+    });
+    usort($allGamesData, function ($a, $b) use ($customOrder) {
+        $orderA = $customOrder[strtolower($a['game_name'])] ?? 999;
+        $orderB = $customOrder[strtolower($b['game_name'])] ?? 999;
+        return $orderA - $orderB;
+    });
+}
+
+// Fetch all game timings for admin editor
+if (isAdminLoggedIn()) {
+    try {
+        $stmt = $pdo->query("SELECT * FROM game_timings ORDER BY display_order, id");
+        $all_game_timings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $all_game_timings = [];
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT * FROM game_rates ORDER BY display_order, id");
+        $all_game_rates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $all_game_rates = [];
+    }
+}
 
 require_once 'header.php';
 ?>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="./css/style.css">
+<meta charset="UTF-8">
 
 <!-- Success/Error Messages from admin actions -->
 <?php if (isset($_SESSION['success'])): ?>
@@ -44,59 +201,70 @@ require_once 'header.php';
     </div>
 <?php endif; ?>
 
-<!-- Live Box -->
+<!-- ============================================ -->
+<!-- LIVE BOX -->
+<!-- ============================================ -->
 <div class="live-box">
     <div id="clock" class="clock"></div>
     <h2>हा भाई यही आती हे सबसे पहले खबर रूको और देखो</h2>
-    <h1>DISAWER</h1>
-    <div class="result-number"><?php echo $disawer_result; ?></div>
+    <h1><?php echo htmlspecialchars(strtoupper($live_game_name)); ?></h1>
+    <div class="result-number">
+        <?php
+        if ($live_result == 'WAIT' || $live_result == '-1' || empty($live_result)) {
+            echo '<span style="color: #d32f2f; font-size: 24px;">⏳ WAIT</span>';
+        } else {
+            echo htmlspecialchars($live_result);
+        }
+        ?>
+    </div>
 </div>
 
-<div class="highlight">disawer</div>
-<div class="disawer-timing">5:15 AM</div>
-<div class="disawer-arrow"><?php echo $disawer_yesterday; ?> ➡️ <?php echo $disawer_result; ?></div>
+<!-- ============================================ -->
+<!-- DISAWAR BOX -->
+<!-- ============================================ -->
+<div class="highlight"><?php echo htmlspecialchars(strtolower($disawer_display_name)); ?></div>
+<div class="disawer-timing"><?php echo htmlspecialchars($disawer_time); ?></div>
+<div class="disawer-arrow">
+    <?php echo htmlspecialchars($disawer_yesterday); ?> ➡️
+    <?php
+    if ($disawer_result == 'WAIT' || $disawer_result == '-1' || empty($disawer_result)) {
+        echo 'WAIT';
+    } else {
+        echo htmlspecialchars($disawer_result);
+    }
+    ?>
+</div>
 
 <!-- WhatsApp & Telegram Cards -->
 <div class="social-cards-wrapper">
     <div class="social-card whatsapp-card">
         <div class="social-card-content">
-            <p class="social-text">"NOW WHATSAPP PLAYERS CAN ALSO JOIN OUR WHATSAPP CHANNEL TO GET RESULTS QUICKLY AND
-                RECEIVE SUPERFAST RESULTS."</p>
-            <a href="https://wa.me/+919812287328" target="_blank" class="social-btn whatsapp-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
-                    <path fill="#25D366"
-                        d="M35.5,12.5C31.9,8.9,27.1,7,22,7c-8.3,0-15,6.7-15,15c0,2.7,0.7,5.3,2,7.6L7,41l11.9-3.1c2.2,1.2,4.7,1.8,7.2,1.8h0c8.3,0,15-6.7,15-15C41,18.6,39.1,14.1,35.5,12.5z" />
-                    <path fill="#FFF"
-                        d="M24.1,9.5c-7.2,0-13,5.8-13,13c0,2.3,0.6,4.5,1.7,6.4L11.7,36l7.4-1.9c1.9,1,4,1.6,6.2,1.6c7.2,0,13-5.8,13-13S31.3,9.5,24.1,9.5z M33.6,24.6c-0.5,1.5-2.6,2.8-4.2,3.1c-0.7,0.1-1.3,0.2-1.8,0.2c-0.9,0-1.9-0.3-2.9-0.9c-1.3-0.8-2.4-1.9-3.5-3c-0.9-0.9-1.8-2-2.5-3.1c-0.7-1.1-1.2-2.1-1.2-3c0-0.9,0.3-1.6,0.9-2.1c0.4-0.4,0.9-0.6,1.3-0.6c0.3,0,0.6,0,0.9,0c0.3,0,0.6,0,0.9,0.5c0.3,0.5,0.8,1.5,0.9,1.6c0.1,0.2,0.1,0.4,0,0.6c0,0.2-0.1,0.3-0.2,0.5c-0.1,0.2-0.3,0.4-0.4,0.6c-0.1,0.2-0.2,0.3-0.1,0.5c0.1,0.2,0.5,0.8,0.9,1.3c0.6,0.8,1.3,1.5,2.1,2c0.8,0.5,1.5,0.8,2.1,0.9c0.3,0.1,0.5,0.1,0.7,0c0.2-0.1,0.4-0.2,0.5-0.4c0.1-0.2,0.4-0.4,0.5-0.6c0.1-0.2,0.4-0.2,0.6-0.1c0.2,0.1,1.5,0.7,1.8,0.8c0.3,0.1,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.8-0.1,1.3C33.9,24.1,33.8,24.3,33.6,24.6z" />
-                </svg>
-                Click to chat
+            <p class="social-text">
+                <?php echo htmlspecialchars($top_whatsapp_text); ?>
+            </p>
+            <a href="https://wa.me/<?php echo htmlspecialchars($top_whatsapp_number); ?>" target="_blank"
+                class="social-btn whatsapp-btn">
+                <?php echo htmlspecialchars($top_whatsapp_btn); ?>
             </a>
         </div>
     </div>
 
     <div class="social-card telegram-card">
         <div class="social-card-content">
-            <p class="social-text">"NOW TELEGRAM PLAYERS CAN ALSO JOIN OUR TELEGRAM CHANNEL TO GET RESULTS QUICKLY AND
-                RECEIVE SUPERFAST RESULTS."</p>
-            <a href="https://t.me/a7Resultupdates" target="_blank" class="social-btn telegram-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
-                    <path fill="#26A5E4"
-                        d="M41.4,8.9L5.9,21.9c-1.1,0.4-1.1,2,0,2.4l8.8,3.1l3.5,10.8c0.3,1,1.5,1.3,2.2,0.5l4.7-4.6l9.3,6.8c0.9,0.7,2.2,0.1,2.5-0.8l5.1-20.5C42.7,15.3,42,14.5,34.4,14.1z M25.1,27.2c-0.3,0.3-0.7,0.5-1.1,0.3c-0.4-0.2-0.5-0.6-0.4-1l0.8-4l5-4.5L25.1,27.2z" />
-                </svg>
-                Click to Connect
+            <p class="social-text">
+                <?php echo htmlspecialchars($telegram_text); ?>
+            </p>
+            <a href="<?php echo htmlspecialchars($telegram_link); ?>" target="_blank" class="social-btn telegram-btn">
+                <?php echo htmlspecialchars($telegram_btn); ?>
             </a>
         </div>
     </div>
 </div>
 
-<!-- Notification Cards -->
-<div class="notification-card">
-    <h2>A1SATTA DISAWER CHART FOR <?php echo date('Y'); ?> IS AVAILABLE</h2>
-</div>
-
-<!-- Game Timings -->
+<!-- ============================================ -->
+<!-- GAME TIMINGS - EMOJI REMOVED -->
+<!-- ============================================ -->
 <div id="play-time-info" style="position: relative;">
-    <!-- Admin Edit Button - Visible only when logged in -->
     <?php if (isAdminLoggedIn()): ?>
         <button onclick="openPlayTimeEditor()" style="
             position: absolute;
@@ -120,152 +288,185 @@ require_once 'header.php';
         </button>
     <?php endif; ?>
 
-    <p>🔰 *Online khaiwal* 🔰</p>
-    <p>*( Raj Bhai Khaiwal )*</p>
+    <p><?php echo htmlspecialchars($khaiwal_line1); ?></p>
+    <p><?php echo htmlspecialchars($khaiwal_line2); ?></p>
     <p>🎊🎊🎊🎊🎊</p>
-    <p>🔰 *All game timing* 🔰</p>
+    <p>🔰 All game timing 🔰</p>
 
-    <!-- Timings Container -->
     <div id="timings-container">
         <?php foreach ($game_timings as $timing): ?>
             <p data-timing-id="<?php echo $timing['id']; ?>">
-                <?php echo $timing['emoji']; ?> *<?php echo ucfirst($timing['game_name']); ?>...
-                <?php echo $timing['timing']; ?>*
+                <?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?>...
+                <?php echo htmlspecialchars($timing['timing']); ?>
             </p>
         <?php endforeach; ?>
+        <?php if (empty($game_timings)): ?>
+            <p>*Disawar... 5:15 AM*</p>
+            <p>*Gali... 11:15 PM*</p>
+        <?php endif; ?>
     </div>
 
-    <p>*फोन पे, गूगल पे=* *scanner*</p>
+    <p>*फोन पे, गूगल पे= *scanner*</p>
     <p>*Rate list* *राधे राधे*</p>
 
-    <!-- Rates Container -->
     <div id="rates-container">
-        <?php
-        $rates = getGameRates($pdo);
-        foreach ($rates as $rate):
-            ?>
+        <?php foreach ($rates as $rate): ?>
             <p data-rate-id="<?php echo $rate['id']; ?>">
-                *<?php echo $rate['rate_type']; ?>=<?php echo $rate['rate_value']; ?>*
+                <?php echo htmlspecialchars($rate['rate_type']); ?>=<?php echo htmlspecialchars($rate['rate_value']); ?>*
             </p>
         <?php endforeach; ?>
+        <?php if (empty($rates)): ?>
+            <p>*जोड़ी रेट=10 ke..960*</p>
+            <p>*हरूप रेट=10 ke..90*</p>
+        <?php endif; ?>
     </div>
 
     <p>🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻</p>
     <p>सीधे सट्टा कंपनी का No 1 खाईवाल *Game play करने के लिये नीचे क्लिक करे*</p>
-    <a href="https://wa.me/+919812287328" target="_blank">
-        <div>
+    <div class="whatsapp-button">
+        <a href="https://wa.me/<?php echo htmlspecialchars($whatsapp_number); ?>" target="_blank">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24">
                 <path fill="#25D366"
                     d="M35.5,12.5C31.9,8.9,27.1,7,22,7c-8.3,0-15,6.7-15,15c0,2.7,0.7,5.3,2,7.6L7,41l11.9-3.1c2.2,1.2,4.7,1.8,7.2,1.8h0c8.3,0,15-6.7,15-15C41,18.6,39.1,14.1,35.5,12.5z" />
                 <path fill="#FFF"
                     d="M24.1,9.5c-7.2,0-13,5.8-13,13c0,2.3,0.6,4.5,1.7,6.4L11.7,36l7.4-1.9c1.9,1,4,1.6,6.2,1.6c7.2,0,13-5.8,13-13S31.3,9.5,24.1,9.5z M33.6,24.6c-0.5,1.5-2.6,2.8-4.2,3.1c-0.7,0.1-1.3,0.2-1.8,0.2c-0.9,0-1.9-0.3-2.9-0.9c-1.3-0.8-2.4-1.9-3.5-3c-0.9-0.9-1.8-2-2.5-3.1c-0.7-1.1-1.2-2.1-1.2-3c0-0.9,0.3-1.6,0.9-2.1c0.4-0.4,0.9-0.6,1.3-0.6c0.3,0,0.6,0,0.9,0c0.3,0,0.6,0,0.9,0.5c0.3,0.5,0.8,1.5,0.9,1.6c0.1,0.2,0.1,0.4,0,0.6c0,0.2-0.1,0.3-0.2,0.5c-0.1,0.2-0.3,0.4-0.4,0.6c-0.1,0.2-0.2,0.3-0.1,0.5c0.1,0.2,0.5,0.8,0.9,1.3c0.6,0.8,1.3,1.5,2.1,2c0.8,0.5,1.5,0.8,2.1,0.9c0.3,0.1,0.5,0.1,0.7,0c0.2-0.1,0.4-0.2,0.5-0.4c0.1-0.2,0.4-0.4,0.5-0.6c0.1-0.2,0.4-0.2,0.6-0.1c0.2,0.1,1.5,0.7,1.8,0.8c0.3,0.1,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.8-0.1,1.3C33.9,24.1,33.8,24.3,33.6,24.6z" />
             </svg>
-            What's App
-            <p>Click to chat</p>
-        </div>
-    </a>
+            <?php echo htmlspecialchars($whatsapp_text); ?>
+            <p>
+                <?php echo htmlspecialchars($whatsapp_subtext); ?>
+            </p>
+        </a>
+    </div>
 </div>
 
-<!-- TABLE 1 - Main Games -->
-<div class="table-wrapper">
-    <table class="result-table">
-        <thead>
-            <tr>
-                <th><?php echo $table_header_display; ?></th>
-                <th>कल आया था</th>
-                <th>आज का रिज़ल्ट</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($table1_game_names as $game):
-                $data = $all_results[$game] ?? ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
-                $display_name = !empty($data['display_name']) ? $data['display_name'] : strtoupper($game);
-                $is_wait = ($data['today_result'] == 'WAIT' || $data['today_result'] == '-1' || empty($data['today_result']));
-                ?>
+<!-- ============================================ -->
+<!-- TABLE 1 - All Games (Dynamic from Database) -->
+<!-- ============================================ -->
+<?php
+// Get base URL dynamically
+$base_path = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
+$base_url = $base_path . '/';
+
+if (!empty($allGamesData)):
+    ?>
+    <div class="table-wrapper">
+        <table class="result-table">
+            <thead>
                 <tr>
-                    <td class="game-name">
-                        <a
-                            href="/<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
-                        <span class="game-time"><?php echo $data['result_time']; ?></span>
-                    </td>
-                    <td class="yesterday-result"><?php echo $data['yesterday_result']; ?></td>
-                    <td class="today-result">
-                        <?php if ($is_wait): ?>
-                            <span class="wait-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
-                                    fill="#d32f2f">
-                                    <path
-                                        d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
-                                    <path
-                                        d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
-                                </svg>
-                                WAIT
-                            </span>
-                        <?php else: ?>
-                            <span class="result-value"><?php echo $data['today_result']; ?></span>
-                        <?php endif; ?>
-                    </td>
+                    <th><?php echo $table_header_display; ?></th>
+                    <th>कल आया था</th>
+                    <th>आज का रिज़ल्ट</th>
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                <?php foreach ($allGamesData as $game):
+                    $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
+                    $is_wait = ($game['today_result'] == 'WAIT' || $game['today_result'] == '-1' || empty($game['today_result']));
+                    $game_slug = strtolower(str_replace(' ', '-', $game['game_name']));
+                    ?>
+                    <tr>
+                        <td class="game-name">
+                            <a href="<?php echo $base_url; ?>game.php?game=<?php echo urlencode($game_slug); ?>">
+                                <?php echo strtoupper(htmlspecialchars($display_name)); ?>
+                            </a>
+                            <span class="game-time"><?php echo htmlspecialchars($game['result_time'] ?? '--'); ?></span>
+                        </td>
+                        <td class="yesterday-result"><?php echo htmlspecialchars($game['yesterday_result'] ?? '--'); ?></td>
+                        <td class="today-result">
+                            <?php if ($is_wait): ?>
+                                <span class="wait-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
+                                        fill="#d32f2f">
+                                        <path
+                                            d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
+                                        <path
+                                            d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
+                                    </svg>
+                                    WAIT
+                                </span>
+                            <?php else: ?>
+                                <span class="result-value"><?php echo htmlspecialchars($game['today_result']); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
 
-<!-- TABLE 2 - Extra Games -->
-<div class="table-wrapper">
-    <table class="result-table">
-        <thead>
-            <tr>
-                <th><?php echo $table_header_display; ?></th>
-                <th>कल आया था</th>
-                <th>आज का रिज़ल्ट</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($table2_game_names as $game):
-                $data = $all_results[$game] ?? ['yesterday_result' => '--', 'today_result' => 'WAIT', 'result_time' => '--', 'display_name' => $game];
-                $display_name = !empty($data['display_name']) ? $data['display_name'] : strtoupper($game);
-                $is_wait = ($data['today_result'] == 'WAIT' || $data['today_result'] == '-1' || empty($data['today_result']));
-                ?>
+<!-- ============================================ -->
+<!-- TABLE 2 - Custom Tables -->
+<!-- ============================================ -->
+<?php
+$customTables = getCustomTables($pdo);
+foreach ($customTables as $customTable):
+    $tableGames = getCustomTableGames($pdo, $customTable['id']);
+    if (empty($tableGames))
+        continue;
+    ?>
+    <div class="table-wrapper">
+        <table class="result-table">
+            <thead>
                 <tr>
-                    <td class="game-name">
-                        <a
-                            href="/<?php echo strtolower(str_replace(' ', '-', $game)); ?>"><?php echo strtoupper($display_name); ?></a>
-                        <span class="game-time"><?php echo $data['result_time']; ?></span>
-                    </td>
-                    <td class="yesterday-result"><?php echo $data['yesterday_result']; ?></td>
-                    <td class="today-result">
-                        <?php if ($is_wait): ?>
-                            <span class="wait-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
-                                    fill="#d32f2f">
-                                    <path
-                                        d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
-                                    <path
-                                        d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
-                                </svg>
-                                WAIT
-                            </span>
-                        <?php else: ?>
-                            <span class="result-value"><?php echo $data['today_result']; ?></span>
-                        <?php endif; ?>
-                    </td>
+                    <th><?php echo $table_header_display; ?></th>
+                    <th>कल आया था</th>
+                    <th>आज का रिज़ल्ट</th>
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                <?php foreach ($tableGames as $game):
+                    $display_name = !empty($game['display_name']) ? $game['display_name'] : strtoupper($game['game_name']);
+                    $is_wait = ($game['today_result'] == 'WAIT' || $game['today_result'] == '-1' || empty($game['today_result']));
+                    $game_slug = strtolower(str_replace(' ', '-', $game['game_name']));
+                    ?>
+                    <tr>
+                        <td class="game-name">
+                            <a href="<?php echo $base_url; ?>game.php?game=<?php echo urlencode($game_slug); ?>">
+                                <?php echo strtoupper(htmlspecialchars($display_name)); ?>
+                            </a>
+                            <span class="game-time"><?php echo htmlspecialchars($game['result_time'] ?? '--'); ?></span>
+                        </td>
+                        <td class="yesterday-result"><?php echo htmlspecialchars($game['yesterday_result'] ?? '--'); ?></td>
+                        <td class="today-result">
+                            <?php if ($is_wait): ?>
+                                <span class="wait-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28"
+                                        fill="#d32f2f">
+                                        <path
+                                            d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.41,0-8-3.59-8-8s3.59-8,8-8s8,3.59,8,8 S16.41,20,12,20z" />
+                                        <path
+                                            d="M12,6c-0.55,0-1,0.45-1,1v5c0,0.55,0.45,1,1,1h4c0.55,0,1-0.45,1-1s-0.45-1-1-1h-3V7C13,6.45,12.55,6,12,6z" />
+                                    </svg>
+                                    WAIT
+                                </span>
+                            <?php else: ?>
+                                <span class="result-value"><?php echo htmlspecialchars($game['today_result']); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endforeach; ?>
 
-<!-- Chart Selector -->
-<!-- Chart Selector -->
+<!-- ============================================ -->
+<!-- CHART SELECTOR -->
+<!-- ============================================ -->
 <div class="chart-selector">
     <select id="chartGameSelect">
         <option value="">-- Select Game --</option>
         <?php
-        $all_game_names = getGameNames($pdo);
+        // Loop through ALL game names fetched from both tables
         foreach ($all_game_names as $game):
+            // Skip empty values
+            if (empty($game))
+                continue;
             ?>
-            <option value="<?php echo $game; ?>"><?php echo strtoupper($game); ?></option>
+            <option value="<?php echo htmlspecialchars($game); ?>">
+                <?php echo strtoupper(htmlspecialchars($game)); ?>
+            </option>
         <?php endforeach; ?>
     </select>
     <select id="chartYearSelect">
@@ -303,19 +504,19 @@ require_once 'header.php';
     </div>
 </div>
 
-<!-- Play Time Editor Modal - Admin Only -->
+<!-- ============================================ -->
+<!-- PLAY TIME EDITOR MODAL - EMOJI REMOVED -->
+<!-- ============================================ -->
 <?php if (isAdminLoggedIn()): ?>
     <div id="playTimeEditorModal"
         style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
         <div
             style="background: #fff; border-radius: 30px; padding: 30px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; position: relative;">
-            <!-- Close Button -->
             <button onclick="closePlayTimeEditor()"
                 style="position: sticky; top: 0; float: right; background: #dc3545; color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 24px; cursor: pointer; z-index: 10;">✕</button>
 
             <h2 style="color: #1a1a2e; text-align: center; margin-bottom: 30px;">✏️ Edit Play Time Info</h2>
 
-            <!-- Tabs -->
             <div
                 style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
                 <button onclick="showPlayTimeTab('timings')" id="tabTimingsBtn"
@@ -326,17 +527,14 @@ require_once 'header.php';
                     Rates</button>
             </div>
 
-            <!-- Timings Tab -->
             <div id="timingsTab">
                 <div style="background: #f9f9f9; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #1a1a2e;">➕ Add New Timing</h3>
-                    <form id="addTimingForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form id="addTimingForm" style="display: flex; gap: 10px; flex-wrap: wrap;" onsubmit="return false;">
                         <input type="text" id="newTimingGame" placeholder="Game Name"
                             style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <input type="text" id="newTimingTime" placeholder="Time (e.g. 5:15 AM)"
                             style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
-                        <input type="text" id="newTimingEmoji" placeholder="Emoji (e.g. 😇)"
-                            style="flex: 0 0 80px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <button type="button" onclick="addTiming()"
                             style="padding: 10px 25px; background: #28a745; color: #fff; border: none; border-radius: 40px; font-weight: bold; cursor: pointer;">➕
                             Add</button>
@@ -347,18 +545,18 @@ require_once 'header.php';
                     <table style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr style="background: #1a1a2e; color: #ffd700;">
-                                <th style="padding: 10px; text-align: left;">Emoji</th>
                                 <th style="padding: 10px; text-align: left;">Game</th>
                                 <th style="padding: 10px; text-align: left;">Timing</th>
                                 <th style="padding: 10px; text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="timingsList">
-                            <?php foreach (getAllGameTimings($pdo) as $timing): ?>
+                            <?php foreach ($all_game_timings as $timing): ?>
                                 <tr id="timing-row-<?php echo $timing['id']; ?>" style="border-bottom: 1px solid #eee;">
-                                    <td style="padding: 8px; font-size: 24px;"><?php echo $timing['emoji']; ?></td>
-                                    <td style="padding: 8px;"><strong><?php echo ucfirst($timing['game_name']); ?></strong></td>
-                                    <td style="padding: 8px;"><?php echo $timing['timing']; ?></td>
+                                    <td style="padding: 8px;">
+                                        <strong><?php echo htmlspecialchars(ucfirst($timing['game_name'])); ?></strong>
+                                    </td>
+                                    <td style="padding: 8px;"><?php echo htmlspecialchars($timing['timing']); ?></td>
                                     <td style="padding: 8px; text-align: center;">
                                         <button onclick="editTiming(<?php echo $timing['id']; ?>)"
                                             style="padding: 5px 12px; background: #ffd700; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">✏️</button>
@@ -372,11 +570,10 @@ require_once 'header.php';
                 </div>
             </div>
 
-            <!-- Rates Tab -->
             <div id="ratesTab" style="display: none;">
                 <div style="background: #f9f9f9; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
                     <h3 style="margin-top: 0; color: #1a1a2e;">➕ Add New Rate</h3>
-                    <form id="addRateForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form id="addRateForm" style="display: flex; gap: 10px; flex-wrap: wrap;" onsubmit="return false;">
                         <input type="text" id="newRateType" placeholder="Rate Type (e.g. जोड़ी रेट)"
                             style="flex: 1; min-width: 150px; padding: 10px; border-radius: 10px; border: 2px solid #ddd;">
                         <input type="text" id="newRateValue" placeholder="Rate Value (e.g. 10 ke..960)"
@@ -397,10 +594,12 @@ require_once 'header.php';
                             </tr>
                         </thead>
                         <tbody id="ratesList">
-                            <?php foreach (getAllGameRates($pdo) as $rate): ?>
+                            <?php foreach ($all_game_rates as $rate): ?>
                                 <tr id="rate-row-<?php echo $rate['id']; ?>" style="border-bottom: 1px solid #eee;">
-                                    <td style="padding: 8px;"><strong><?php echo $rate['rate_type']; ?></strong></td>
-                                    <td style="padding: 8px;"><?php echo $rate['rate_value']; ?></td>
+                                    <td style="padding: 8px;">
+                                        <strong><?php echo htmlspecialchars($rate['rate_type']); ?></strong>
+                                    </td>
+                                    <td style="padding: 8px;"><?php echo htmlspecialchars($rate['rate_value']); ?></td>
                                     <td style="padding: 8px; text-align: center;">
                                         <button onclick="editRate(<?php echo $rate['id']; ?>)"
                                             style="padding: 5px 12px; background: #ffd700; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">✏️</button>
@@ -414,7 +613,6 @@ require_once 'header.php';
                 </div>
             </div>
 
-            <!-- Edit Forms -->
             <div id="editTimingForm"
                 style="display: none; background: #fff8e7; padding: 20px; border-radius: 15px; margin-top: 20px; border: 2px solid #ffd700;">
                 <h3 style="margin-top: 0; color: #c49a00;">✏️ Edit Timing</h3>
@@ -424,8 +622,6 @@ require_once 'header.php';
                         style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
                     <input type="text" id="editTimingTime" placeholder="Time"
                         style="flex: 1; min-width: 120px; padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
-                    <input type="text" id="editTimingEmoji" placeholder="Emoji"
-                        style="flex: 0 0 80px; padding: 10px; border-radius: 10px; border: 2px solid #ffd700;">
                     <button onclick="updateTiming()"
                         style="padding: 10px 25px; background: #ffd700; border: none; border-radius: 40px; font-weight: bold; cursor: pointer;">💾
                         Update</button>
@@ -452,6 +648,8 @@ require_once 'header.php';
             </div>
         </div>
     </div>
+
+    <script src="./js/index-funtions.js"></script>
 <?php endif; ?>
 
 <!-- Content Section -->
@@ -495,7 +693,7 @@ require_once 'header.php';
     <h5><strong>What is DELHI BAZAR SATTA KING?</strong></h5>
     <p>The term satta king delhi bazar came from the game delhi bazar Satta which is quite popular game which named upon
         capital of India which is Delhi. and the word "bazar" means Market so the collected word will mean as Delhi
-        Market butin context to satta king , it means a game which have number from 0 to 99 where everyday at 3:15 one
+        Market but in context to satta king , it means a game which have number from 0 to 99 where everyday at 3:15 one
         number is announced by game owner which is unknown and players who had bid for same number will be rewarded with
         100 times of the bid amount and those who bid the wrong number will be loser and will have to loose their money
         so playing satta king delhi bajar is not quite easy as it have financial burden to end up loosing. Also keep in
@@ -538,20 +736,9 @@ require_once 'header.php';
 </div>
 
 <div class="footer">
-    <a href="/privacy-policy">Privacy Policy</a>
-    <a href="/terms-and-conditions">Terms & Conditions</a>
-    <a href="/disclaimer">Disclaimer</a>
-    <p>© 2026 A1 satta live | All Rights Reserved</p>
+    <a href="privacy-policy.php">Privacy Policy</a>
+    <a href="terms-conditions.php">Terms & Conditions</a>
 </div>
-
-<div class="disclaimer">
-    !! DISCLAIMER - A1 satta live is a non-commercial informational website. Please view this site at your own risk, All
-    The Information Shown On Website Is Sponsored And We Warn You That satta matka Gambling/Satta May Be Banned Or
-    Illegal In Your Country. We Are Not Responsible For Any Issues Or Scam..., We Respect All Country Rules/Laws... If
-    You Not Agree With Our Site disclaimer Please Quit Our Site Right Now. Thank You.
-</div>
-
-<!-- Include JavaScript file -->
 <script src="js/chart-functions.js"></script>
 
 <?php require_once 'footer.php'; ?>

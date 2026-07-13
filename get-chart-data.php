@@ -3,52 +3,67 @@ require_once 'config.php';
 
 header('Content-Type: application/json');
 
-$game = $_POST['game'] ?? '';
-$year = $_POST['year'] ?? date('Y');
-$month = $_POST['month'] ?? date('m');
+$game = trim($_POST['game'] ?? '');
+$year = trim($_POST['year'] ?? date('Y'));
+$month = trim($_POST['month'] ?? date('m'));
 
 if (empty($game)) {
-    echo json_encode(['success' => false, 'message' => 'Game name is required']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Game name is required'
+    ]);
     exit();
 }
 
 try {
-    // Debug: Log the search parameters
-    error_log("Searching for: game=$game, month=$month, year=$year");
+    error_log("Chart Search => Game: $game | Month: $month | Year: $year");
 
-    // Get chart data for the selected game and month
-    // The date format in DB is like "01-06" (DD-MM)
-    $search_pattern = $month . '-' . $year;
+    
+    $start_date = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
+    $end_date = date('Y-m-t', strtotime($start_date));
+    
+    error_log("Date range: $start_date to $end_date");
+    
+    // Query using new schema (chart_date, result)
+    $stmt = $pdo->prepare("
+        SELECT chart_date, result
+        FROM chart_data
+        WHERE LOWER(game_name) = LOWER(?)
+        AND chart_date BETWEEN ? AND ?
+        ORDER BY chart_date DESC
+    ");
 
-    $stmt = $pdo->prepare("SELECT * FROM chart_data 
-                           WHERE game_name = ? 
-                           AND date LIKE ? 
-                           ORDER BY date ASC");
-    $stmt->execute([$game, $search_pattern . '%']);
+    $stmt->execute([
+        $game,
+        $start_date,
+        $end_date
+    ]);
+
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Debug: Log results count
-    error_log("Found " . count($results) . " results for game=$game, pattern=$search_pattern%");
+    error_log("Chart Results Found: " . count($results));
 
     if (empty($results)) {
-        // Try without the year to see if data exists with different year
-        $stmt2 = $pdo->prepare("SELECT * FROM chart_data WHERE game_name = ? ORDER BY date ASC");
-        $stmt2->execute([$game]);
-        $all_results = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        // Debug check if game exists at all in chart_data
+        $checkStmt = $pdo->prepare("
+            SELECT COUNT(*) as total
+            FROM chart_data
+            WHERE LOWER(game_name) = LOWER(?)
+        ");
+        $checkStmt->execute([$game]);
+        $gameExists = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!empty($all_results)) {
-            // Data exists but not for this month/year
+        if ($gameExists['total'] > 0) {
             echo json_encode([
                 'success' => false,
-                'message' => 'No chart data found for ' . strtoupper($game) . ' in ' . $month . '-' . $year . '. Data exists for other dates.'
+                'message' => 'Data exists for this game but not for selected month.'
             ]);
-            exit();
+        } else {
+            echo json_encode([
+                'success' => false,
+                'message' => 'No chart data found for ' . strtoupper($game)
+            ]);
         }
-
-        echo json_encode([
-            'success' => false,
-            'message' => 'No chart data found for ' . strtoupper($game)
-        ]);
         exit();
     }
 
@@ -56,12 +71,22 @@ try {
         'success' => true,
         'data' => $results,
         'game' => $game,
+        'month' => $month,
         'year' => $year,
-        'month' => $month
+        'total_records' => count($results)
     ]);
 
 } catch (PDOException $e) {
-    error_log("Database error: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    error_log("Chart Data Error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Database Error: ' . $e->getMessage()
+    ]);
+} catch (Exception $e) {
+    error_log("Chart Data Error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error: ' . $e->getMessage()
+    ]);
 }
 ?>

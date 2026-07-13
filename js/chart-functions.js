@@ -1,5 +1,21 @@
 // ============ CHART FUNCTIONS ============
 
+// Month names array for display
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 // Load chart data when check button is clicked
 function loadChartData() {
   const game = document.getElementById("chartGameSelect").value;
@@ -17,27 +33,13 @@ function loadChartData() {
   // Show loading state
   container.style.display = "block";
   display.innerHTML = `
-        <div style="text-align: center; padding: 60px 20px; color: #999;">
+        <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; border-radius: 15px; border: 2px dashed #ccc;">
             <div style="font-size: 48px; margin-bottom: 20px;">⏳</div>
             <div style="font-size: 18px;">Loading chart data for ${game.toUpperCase()}...</div>
         </div>
     `;
 
   // Update title
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
   document.getElementById("chartTitle").textContent =
     game.toUpperCase() +
     " RESULT CHART FOR " +
@@ -94,7 +96,7 @@ function renderChartTable(data, game, year, month) {
             <div style="text-align: center; padding: 60px 20px; background: #fff8e7; border-radius: 15px; border: 2px dashed #ffd700;">
                 <div style="font-size: 48px; margin-bottom: 20px;">📊</div>
                 <h3 style="color: #c49a00;">No chart data found for ${game.toUpperCase()}</h3>
-                <p style="color: #666;">No results found for this game.</p>
+                <p style="color: #666;">No results found for this game in ${monthNames[parseInt(month) - 1]} ${year}.</p>
                 <button onclick="window.location.href='admin-dashboard.php?tab=chart'" style="
                     margin-top: 15px;
                     padding: 12px 30px;
@@ -112,7 +114,7 @@ function renderChartTable(data, game, year, month) {
   }
 
   // Calculate statistics
-  const results = data.map((item) => parseInt(item.result_number) || 0);
+  const results = data.map((item) => parseInt(item.result) || 0);
   const validResults = results.filter((r) => r > 0);
   const max = validResults.length > 0 ? Math.max(...validResults) : 0;
   const min = validResults.length > 0 ? Math.min(...validResults) : 0;
@@ -120,45 +122,41 @@ function renderChartTable(data, game, year, month) {
   const avg =
     validResults.length > 0 ? (sum / validResults.length).toFixed(1) : 0;
 
+  // Count occurrences of each number
+  const frequency = {};
+  validResults.forEach((r) => {
+    frequency[r] = (frequency[r] || 0) + 1;
+  });
+  const mostFrequent =
+    Object.keys(frequency).sort((a, b) => frequency[b] - frequency[a])[0] ||
+    "--";
+
   // Build table
   let html = `
-        <!-- Statistics Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Total Entries</div>
-                <div style="font-size: 28px; font-weight: bold;">${data.length}</div>
-            </div>
-            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: #fff; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Highest</div>
-                <div style="font-size: 28px; font-weight: bold;">${max}</div>
-            </div>
-            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: #fff; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Lowest</div>
-                <div style="font-size: 28px; font-weight: bold;">${min}</div>
-            </div>
-            <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #1a1a2e; padding: 15px 20px; border-radius: 12px; text-align: center;">
-                <div style="font-size: 12px; opacity: 0.8;">Average</div>
-                <div style="font-size: 28px; font-weight: bold;">${avg}</div>
-            </div>
-        </div>
-        
         <!-- Chart Table -->
         <div style="overflow-x: auto; background: #fff; border-radius: 15px; box-shadow: 0 2px 15px rgba(0,0,0,0.08);">
             <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                 <thead>
                     <tr style="background: #1a1a2e; color: #ffd700;">
-                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">📅 Date</th>
-                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">🎯 Result</th>
+                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">Date</th>
+                        <th style="padding: 15px; border: 1px solid #333; text-align: center; font-size: 16px;">Result</th>
                     </tr>
                 </thead>
                 <tbody>
-    `;
+          `;
 
   data.forEach((item, index) => {
     const rowColor = index % 2 === 0 ? "#f9f9f9" : "#ffffff";
-    const parts = item.date.split("-");
-    const day = parts[0] || item.date;
-    const resultNum = parseInt(item.result_number) || 0;
+    let displayDate = item.chart_date || item.date || "--";
+
+    if (displayDate !== "--") {
+      const parts = displayDate.split("-");
+      if (parts.length === 3) {
+        displayDate = parts[2] + "-" + parts[1];
+      }
+    }
+
+    const resultNum = parseInt(item.result) || 0;
     const isHigh = resultNum > 50;
     const resultColor = isHigh ? "#28a745" : resultNum > 0 ? "#dc3545" : "#666";
 
@@ -167,11 +165,10 @@ function renderChartTable(data, game, year, month) {
                 onmouseover="this.style.background='#fff8e0'" 
                 onmouseout="this.style.background='${rowColor}'">
                 <td style="padding: 12px 15px; text-align: center; font-weight: bold; font-size: 16px;">
-                    ${day}
+                    ${displayDate}
                 </td>
                 <td style="padding: 12px 15px; text-align: center; font-size: 24px; font-weight: bold; color: ${resultColor};">
-                    ${item.result_number || "--"}
-                    ${item.result_number ? (isHigh ? " 🔥" : "") : ""}
+                    ${item.result || "--"}
                 </td>
             </tr>
         `;
@@ -186,15 +183,27 @@ function renderChartTable(data, game, year, month) {
             <div style="color: #666; font-size: 14px;">
                 📊 Showing ${data.length} entries for ${game.toUpperCase()}
             </div>
-            <button onclick="window.location.href='admin-dashboard.php?tab=chart'" style="
-                padding: 10px 25px;
-                background: #ffd700;
-                color: #000;
-                border: none;
-                border-radius: 40px;
-                font-weight: bold;
-                cursor: pointer;
-            ">⚙️ Manage Charts</button>
+            <div>
+                <button onclick="window.location.href='chart.php'" style="
+                    padding: 10px 25px;
+                    background: #6c757d;
+                    color: #fff;
+                    border: none;
+                    border-radius: 40px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    margin-right: 10px;
+                ">📅 View Full Chart</button>
+                <button onclick="window.location.href='admin-dashboard.php?tab=chart'" style="
+                    padding: 10px 25px;
+                    background: #ffd700;
+                    color: #000;
+                    border: none;
+                    border-radius: 40px;
+                    font-weight: bold;
+                    cursor: pointer;
+                ">⚙️ Manage Charts</button>
+            </div>
         </div>
     `;
 
@@ -229,21 +238,20 @@ function showPlayTimeTab(tab) {
   }
 }
 
-// ============ TIMINGS CRUD ============
+// ============ TIMINGS CRUD (EMOJI REMOVED) ============
 function addTiming() {
   const game = document.getElementById("newTimingGame").value.trim();
   const time = document.getElementById("newTimingTime").value.trim();
-  const emoji = document.getElementById("newTimingEmoji").value.trim() || "😇";
 
   if (!game || !time) {
     alert("Please fill in all fields!");
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=add_timing&game=${encodeURIComponent(game)}&time=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`,
+    body: `action=add_timing&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -258,15 +266,19 @@ function addTiming() {
 
 function editTiming(id) {
   const row = document.getElementById("timing-row-" + id);
+  if (!row) {
+    console.error("Row not found for ID:", id);
+    return;
+  }
+
   const cells = row.querySelectorAll("td");
-  const emoji = cells[0].textContent.trim();
-  const game = cells[1].textContent.trim();
-  const time = cells[2].textContent.trim();
+  // cells[0] = Game Name, cells[1] = Timing (emoji removed)
+  const game = cells[0].textContent.trim();
+  const time = cells[1].textContent.trim();
 
   document.getElementById("editTimingId").value = id;
   document.getElementById("editTimingGame").value = game;
   document.getElementById("editTimingTime").value = time;
-  document.getElementById("editTimingEmoji").value = emoji;
   document.getElementById("editTimingForm").style.display = "block";
   document
     .getElementById("editTimingForm")
@@ -277,17 +289,16 @@ function updateTiming() {
   const id = document.getElementById("editTimingId").value;
   const game = document.getElementById("editTimingGame").value.trim();
   const time = document.getElementById("editTimingTime").value.trim();
-  const emoji = document.getElementById("editTimingEmoji").value.trim() || "😇";
 
-  if (!game || !time) {
+  if (!id || !game || !time) {
     alert("Please fill in all fields!");
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=update_timing&id=${id}&game=${encodeURIComponent(game)}&time=${encodeURIComponent(time)}&emoji=${encodeURIComponent(emoji)}`,
+    body: `action=update_timing&id=${id}&game_name=${encodeURIComponent(game)}&timing=${encodeURIComponent(time)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -307,7 +318,7 @@ function cancelEditTiming() {
 function deleteTiming(id) {
   if (!confirm("Are you sure you want to delete this timing?")) return;
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=delete_timing&id=${id}`,
@@ -333,10 +344,10 @@ function addRate() {
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=add_rate&type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
+    body: `action=add_rate&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -351,6 +362,11 @@ function addRate() {
 
 function editRate(id) {
   const row = document.getElementById("rate-row-" + id);
+  if (!row) {
+    console.error("Row not found for ID:", id);
+    return;
+  }
+
   const cells = row.querySelectorAll("td");
   const type = cells[0].textContent.trim();
   const value = cells[1].textContent.trim();
@@ -369,15 +385,15 @@ function updateRate() {
   const type = document.getElementById("editRateType").value.trim();
   const value = document.getElementById("editRateValue").value.trim();
 
-  if (!type || !value) {
+  if (!id || !type || !value) {
     alert("Please fill in all fields!");
     return;
   }
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `action=update_rate&id=${id}&type=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`,
+    body: `action=update_rate&id=${id}&rate_type=${encodeURIComponent(type)}&rate_value=${encodeURIComponent(value)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -397,10 +413,38 @@ function cancelEditRate() {
 function deleteRate(id) {
   if (!confirm("Are you sure you want to delete this rate?")) return;
 
-  fetch("admin-ajax.php", {
+  fetch("ajax-handler.php", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `action=delete_rate&id=${id}`,
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert("Error: " + data.message);
+      }
+    })
+    .catch((error) => alert("Error: " + error));
+}
+
+// ============ MULTIPLE RESULT CRUD ============
+function addMultipleResult() {
+  const game = document.getElementById("mrGameName").value.trim();
+  const date = document.getElementById("mrResultDate").value;
+  const number = document.getElementById("mrResultNumber").value.trim();
+  const time = document.getElementById("mrResultTime").value.trim();
+
+  if (!game || !date || !number) {
+    alert("Please fill in all fields!");
+    return;
+  }
+
+  fetch("ajax-handler.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `action=add_multiple_result&game=${encodeURIComponent(game)}&date=${encodeURIComponent(date)}&number=${encodeURIComponent(number)}&time=${encodeURIComponent(time)}`,
   })
     .then((response) => response.json())
     .then((data) => {
@@ -428,5 +472,14 @@ document.addEventListener("keydown", function (event) {
     if (modal.style.display === "flex") {
       closePlayTimeEditor();
     }
+  }
+});
+
+// Load on page load if game is selected
+document.addEventListener("DOMContentLoaded", function () {
+  // Auto-load chart if game is pre-selected
+  const gameSelect = document.getElementById("chartGameSelect");
+  if (gameSelect && gameSelect.value) {
+    // Don't auto-load, wait for user to click Check
   }
 });
