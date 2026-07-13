@@ -1,89 +1,462 @@
 <?php
+
+/**
+ * Cron Job: Update Game Results
+ *
+ * Purpose:
+ * - Move today_result to yesterday_result
+ * - Reset today_result to WAIT
+ * - Reset is_latest flags
+ * - Set Disawar as the latest/default game
+ *
+ * Intended execution:
+ * - PHP CLI through Hostinger Cron Jobs
+ * - Once every day at midnight
+ */
+
 date_default_timezone_set('Asia/Kolkata');
-require_once 'config.php';
+
+// ======================================================
+// CONFIGURATION
+// ======================================================
 
 $log_file = __DIR__ . '/cron_log.txt';
+$lock_file = __DIR__ . '/cron-update-results.lock';
+
+
+// ======================================================
+// LOGGING FUNCTION
+// ======================================================
 
 function log_message($message)
 {
     global $log_file;
+
     $timestamp = date('Y-m-d H:i:s');
-    file_put_contents($log_file, "[$timestamp] $message\n", FILE_APPEND);
+
+    $formattedMessage = "[$timestamp] $message" . PHP_EOL;
+
+    // Write to log file
+    $result = file_put_contents(
+        $log_file,
+        $formattedMessage,
+        FILE_APPEND | LOCK_EX
+    );
+
+    // Also print to standard output for Hostinger "View output"
+    echo $formattedMessage;
+
+    // If logging fails, write to PHP error log
+    if ($result === false) {
+        error_log(
+            "CRON ERROR: Could not write to log file: " . $log_file
+        );
+    }
 }
 
+
+// ======================================================
+// FIRST LOG — BEFORE CONFIG.PHP
+// ======================================================
+
+log_message("");
+log_message("==================================================");
+log_message("===== CRON SCRIPT ENTERED =====");
+log_message("Execution time: " . date('Y-m-d H:i:s'));
+log_message("PHP version: " . PHP_VERSION);
+log_message("PHP SAPI: " . PHP_SAPI);
+log_message("Script directory: " . __DIR__);
+log_message("Current working directory: " . getcwd());
+
+
+// ======================================================
+// PREVENT SIMULTANEOUS EXECUTIONS
+// ======================================================
+
+$lockHandle = fopen($lock_file, 'c');
+
+if ($lockHandle === false) {
+
+    log_message(
+        "ERROR: Could not create or open lock file: " . $lock_file
+    );
+
+    exit(1);
+}
+
+if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+
+    log_message(
+        "WARNING: Another instance of this cron job is already running."
+    );
+
+    fclose($lockHandle);
+
+    exit(0);
+}
+
+log_message("Execution lock acquired successfully.");
+
+
+// ======================================================
+// MAIN EXECUTION
+// ======================================================
+
 try {
+
+    // ==================================================
+    // LOAD DATABASE CONFIGURATION
+    // ==================================================
+
+    $configFile = __DIR__ . '/config.php';
+
+    log_message("Attempting to load config file: " . $configFile);
+
+    if (!file_exists($configFile)) {
+
+        throw new RuntimeException(
+            "config.php was not found at: " . $configFile
+        );
+    }
+
+    require_once $configFile;
+
+    log_message("config.php loaded successfully.");
+
+
+    // ==================================================
+    // VERIFY PDO CONNECTION
+    // ==================================================
+
+    if (!isset($pdo)) {
+
+        throw new RuntimeException(
+            "PDO variable \$pdo is not defined after loading config.php."
+        );
+    }
+
+    if (!($pdo instanceof PDO)) {
+
+        throw new RuntimeException(
+            "\$pdo exists but is not a valid PDO instance."
+        );
+    }
+
+    log_message("PDO database connection verified successfully.");
+
+
+    // ==================================================
+    // START CRON
+    // ==================================================
+
     log_message("===== CRON JOB STARTED =====");
 
-    // Get all games - ONLY existing rows with status = 1 (active)
-    $stmt = $pdo->query("SELECT * FROM game_results WHERE status = 1");
+
+    // ==================================================
+    // START DATABASE TRANSACTION
+    // ==================================================
+
+    $pdo->beginTransaction();
+
+    log_message("Database transaction started.");
+
+
+    // ==================================================
+    // FETCH ACTIVE GAMES
+    // ==================================================
+
+    $stmt = $pdo->query("
+        SELECT
+            id,
+            game_name,
+            today_result
+        FROM game_results
+        WHERE status = 1
+        ORDER BY id ASC
+    ");
+
     $games = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $total_games = count($games);
     $updated_count = 0;
     $skipped_count = 0;
 
+    log_message(
+        "Found $total_games active game(s) to process."
+    );
+
+
+    // ==================================================
+    // PREPARE UPDATE QUERY ONCE
+    // ==================================================
+
+    $update_stmt = $pdo->prepare("
+        UPDATE game_results
+        SET
+            yesterday_result = ?,
+            today_result = 'WAIT',
+            is_latest = 0
+        WHERE id = ?
+    ");
+
+
+    // ==================================================
+    // PROCESS EACH GAME
+    // ==================================================
+
     foreach ($games as $game) {
+
         $today_result = $game['today_result'];
         $game_name = $game['game_name'];
         $game_id = $game['id'];
 
-        log_message("Processing game: $game_name (ID: $game_id) - Today result: '$today_result'");
+        log_message(
+            "Processing game: $game_name " .
+            "(ID: $game_id) - " .
+            "Today result: '$today_result'"
+        );
 
-        // Check if today's result is not WAIT or empty
-        if ($today_result !== 'WAIT' && !empty($today_result) && $today_result !== '-1' && $today_result !== '--') {
-            // UPDATE existing row - NEVER INSERT
-            $update_stmt = $pdo->prepare("UPDATE game_results SET 
-                yesterday_result = ?, 
-                today_result = 'WAIT',
-                is_latest = 0
-                WHERE id = ?");
-            $update_stmt->execute([$today_result, $game_id]);
+
+        // Normalize result for reliable comparison
+        $normalized_result = is_string($today_result)
+            ? trim($today_result)
+            : $today_result;
+
+
+        // Check whether result should be moved
+        $hasValidResult = (
+            $normalized_result !== null &&
+            $normalized_result !== '' &&
+            strtoupper((string) $normalized_result) !== 'WAIT' &&
+            (string) $normalized_result !== '-1' &&
+            (string) $normalized_result !== '--'
+        );
+
+
+        if ($hasValidResult) {
+
+            $update_stmt->execute([
+                $today_result,
+                $game_id
+            ]);
+
 
             if ($update_stmt->rowCount() > 0) {
+
                 $updated_count++;
-                log_message("✅ Updated game: $game_name - Moved '$today_result' to yesterday_result, set today to WAIT");
+
+                log_message(
+                    "SUCCESS: Updated game '$game_name'. " .
+                    "Moved '$today_result' to yesterday_result " .
+                    "and set today_result to WAIT."
+                );
+
             } else {
-                log_message("⚠️ No rows updated for game: $game_name (ID: $game_id)");
+
+                log_message(
+                    "WARNING: No row was changed for '$game_name' " .
+                    "(ID: $game_id)."
+                );
             }
+
         } else {
+
             $skipped_count++;
-            log_message("⏭️ Skipped game: $game_name - Today result is already WAIT or empty");
+
+            log_message(
+                "SKIPPED: '$game_name' because today_result " .
+                "is WAIT, empty, -1, or --."
+            );
         }
     }
 
-    // ============================================
-    // FIX: Reset ALL is_latest to 0, then set ONLY ONE
-    // ============================================
 
-    // Step 1: Reset ALL is_latest flags to 0
-    $pdo->query("UPDATE game_results SET is_latest = 0 WHERE status = 1");
-    log_message("✅ Reset all is_latest flags to 0");
+    // ==================================================
+    // RESET ALL is_latest FLAGS
+    // ==================================================
 
-    // Step 2: Set is_latest = 1 for Disawar (or your preferred default game)
-    // This ensures the Live Box shows Disawar after midnight
-    $stmt = $pdo->prepare("UPDATE game_results SET is_latest = 1 WHERE LOWER(game_name) = 'disawar' AND status = 1");
-    $stmt->execute();
+    $resetStmt = $pdo->prepare("
+        UPDATE game_results
+        SET is_latest = 0
+        WHERE status = 1
+    ");
 
-    if ($stmt->rowCount() > 0) {
-        log_message("✅ Set is_latest = 1 for Disawar");
+    $resetStmt->execute();
+
+    log_message(
+        "Reset is_latest = 0 for active games. " .
+        "Affected rows: " . $resetStmt->rowCount()
+    );
+
+
+    // ==================================================
+    // SET DISAWAR AS LATEST
+    // ==================================================
+
+    $latestStmt = $pdo->prepare("
+        UPDATE game_results
+        SET is_latest = 1
+        WHERE LOWER(TRIM(game_name)) = 'disawar'
+        AND status = 1
+    ");
+
+    $latestStmt->execute();
+
+
+    if ($latestStmt->rowCount() > 0) {
+
+        log_message(
+            "SUCCESS: Set is_latest = 1 for Disawar."
+        );
+
     } else {
-        // If Disawar doesn't exist, set the first game as latest
-        log_message("⚠️ Disawar not found, setting first active game as latest");
-        $stmt = $pdo->query("SELECT id FROM game_results WHERE status = 1 ORDER BY id LIMIT 1");
-        $first = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        log_message(
+            "WARNING: Active Disawar game not found. " .
+            "Attempting to use the first active game."
+        );
+
+
+        // Find first active game
+        $firstStmt = $pdo->query("
+            SELECT id, game_name
+            FROM game_results
+            WHERE status = 1
+            ORDER BY id ASC
+            LIMIT 1
+        ");
+
+        $first = $firstStmt->fetch(PDO::FETCH_ASSOC);
+
+
         if ($first) {
-            $stmt = $pdo->prepare("UPDATE game_results SET is_latest = 1 WHERE id = ?");
-            $stmt->execute([$first['id']]);
-            log_message("✅ Set is_latest = 1 for game ID: " . $first['id']);
+
+            $fallbackStmt = $pdo->prepare("
+                UPDATE game_results
+                SET is_latest = 1
+                WHERE id = ?
+            ");
+
+            $fallbackStmt->execute([
+                $first['id']
+            ]);
+
+            log_message(
+                "SUCCESS: Set is_latest = 1 for fallback game: " .
+                $first['game_name'] .
+                " (ID: " . $first['id'] . ")."
+            );
+
+        } else {
+
+            log_message(
+                "WARNING: No active games were found. " .
+                "Could not set any game as latest."
+            );
         }
     }
 
-    log_message("===== CRON JOB COMPLETED =====");
-    log_message("Updated: $updated_count games, Skipped: $skipped_count games");
+
+    // ==================================================
+    // COMMIT TRANSACTION
+    // ==================================================
+
+    $pdo->commit();
+
+    log_message("Database transaction committed successfully.");
+
+
+    // ==================================================
+    // SUCCESS SUMMARY
+    // ==================================================
+
+    log_message("===== CRON JOB COMPLETED SUCCESSFULLY =====");
+
+    log_message(
+        "SUMMARY: Total = $total_games, " .
+        "Updated = $updated_count, " .
+        "Skipped = $skipped_count"
+    );
+
+    log_message("==================================================");
     log_message("");
 
-} catch (PDOException $e) {
-    log_message("❌ ERROR: " . $e->getMessage());
-} catch (Exception $e) {
-    log_message("❌ ERROR: " . $e->getMessage());
+
+} catch (Throwable $e) {
+
+    // ==================================================
+    // ROLLBACK IF TRANSACTION IS ACTIVE
+    // ==================================================
+
+    if (
+        isset($pdo) &&
+        $pdo instanceof PDO &&
+        $pdo->inTransaction()
+    ) {
+
+        try {
+
+            $pdo->rollBack();
+
+            log_message(
+                "Database transaction rolled back due to error."
+            );
+
+        } catch (Throwable $rollbackError) {
+
+            log_message(
+                "ROLLBACK ERROR: " .
+                $rollbackError->getMessage()
+            );
+        }
+    }
+
+
+    // ==================================================
+    // DETAILED ERROR LOG
+    // ==================================================
+
+    log_message("===== CRON JOB FAILED =====");
+
+    log_message(
+        "ERROR TYPE: " . get_class($e)
+    );
+
+    log_message(
+        "ERROR MESSAGE: " . $e->getMessage()
+    );
+
+    log_message(
+        "ERROR FILE: " . $e->getFile()
+    );
+
+    log_message(
+        "ERROR LINE: " . $e->getLine()
+    );
+
+    log_message("==================================================");
+    log_message("");
+
+
+    // Release execution lock
+    if (isset($lockHandle) && is_resource($lockHandle)) {
+
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+    }
+
+    exit(1);
 }
-?>
+
+
+// ======================================================
+// RELEASE EXECUTION LOCK
+// ======================================================
+
+if (isset($lockHandle) && is_resource($lockHandle)) {
+
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+}
+
+exit(0);
